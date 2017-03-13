@@ -1,1 +1,0 @@
-warning: Only k-mers occurring <= 3 times will be considered, due to small memlimit.

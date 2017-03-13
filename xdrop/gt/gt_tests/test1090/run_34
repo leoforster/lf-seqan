@@ -1,1 +1,0 @@
-$CMD_PREFIX cmp -s default_run.out stdout_33

@@ -1,1 +1,0 @@
-$CMD_PREFIX env G_DEBUG=gc-friendly G_SLICE=always-malloc GT_SEED=1737508626  /home/lf/Desktop/projects/gfaproj/genometools/bin/gt seed_extend -maxalilendiff 10 -history 64 -percmathistory 70 -a -ii at1MB

@@ -1,1 +1,0 @@
-$CMD_PREFIX env G_DEBUG=gc-friendly G_SLICE=always-malloc GT_SEED=1737508626  /home/lf/Desktop/projects/gfaproj/genometools/bin/gt encseq encode -des no -sds no -md5 no -indexname paired /home/lf/Desktop/projects/gfaproj/genometools/testdata/readjoiner/paired_reads_1.fas

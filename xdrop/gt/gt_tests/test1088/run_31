@@ -1,1 +1,0 @@
-$CMD_PREFIX /home/lf/Desktop/projects/gfaproj/genometools/testsuite/../scripts/gen-randseq.rb --number 1 --minidentity 80 --seedlength 14 --length 100 --mode seeded --namedfiles --seed 189224055964190192145211745471700259490
