@@ -1,0 +1,10 @@
+# Find synthetic alignments
+
+$GTDIR/scripts/gen-randseq.rb --minidentity 80 --seedlength 14 --length 1000 --mode seeded --seed 170039800390891361279027638963673934519 --seedcoverage 35 --long 10000  --reverse-complement > longseeded1.fasta
+$GTDIR/scripts/gen-randseq.rb --minidentity 90 --seedlength 14 --length 1000 --mode seeded --seed 170039800390891361279027638963673934519 --seedcoverage 35 --long 10000  --reverse-complement > longseeded2.fasta
+
+gt encseq encode -des no -sds no -md5 no -indexname longseeded1 longseeded1.fasta
+gt encseq encode -des no -sds no -md5 no -indexname longseeded2 longseeded2.fasta
+
+gt seed_extend -extendgreedy -l 900 -minidentity 80 -ii longseeded1 -kmerfile no
+gt seed_extend -extendgreedy -l 900 -minidentity 90 -ii longseeded2 -kmerfile no
