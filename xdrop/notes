@@ -1,0 +1,25 @@
+
+extendAlignment documentation
+http://docs.seqan.de/seqan/2.3.0/global_function_extendAlignment.html
+
+
+extendAlignment example
+http://docs.seqan.de/seqan/2.2.0/demos/dox/align_extend/extend_alignment.cpp
+
+
+Seed class documentation
+http://docs.seqan.de/seqan/2.0.0/class_Seed.html
+
+
+1079: gt seed_extend: small_poly, no extension, verify lists      : ok
+1080: gt seed_extend: small_poly, xdrop vs greedy extension       : ok
+1081: gt seed_extend: at1MB, no extension, memlimit, maxfreq      : ok
+1082: gt seed_extend: diagbandwidth, mincoverage, seedlength      : ok
+1083: gt seed_extend: greedy sensitivity, l, minidentity          : ok
+1084: gt seed_extend: history, percmathistory, maxalilendiff      : ok
+1085: gt seed_extend: extendxdrop, xdropbelow, cam                : ok
+1086: gt seed_extend: failure                                     : ok
+1087: gt seed_extend: artificial sequences                        : ok
+1088: gt seed_extend: self vs query                               : ok
+1089: gt seed_extend: parts                                       : ok
+1090: gt seed_extend: threading                                   : ok

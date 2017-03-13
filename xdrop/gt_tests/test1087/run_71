@@ -1,0 +1,1 @@
+$CMD_PREFIX /home/lf/Desktop/projects/gfaproj/genometools/testsuite/../scripts/gen-randseq.rb --minidentity 90 --seedlength 14 --length 1000 --mode seeded --seed 54623490901073137545509422160541861122 --seedcoverage 35 --long 10000  --reverse-complement > longseeded.fasta

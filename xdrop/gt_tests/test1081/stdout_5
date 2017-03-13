@@ -1,0 +1,14 @@
+# Options: -only-seeds -v -maxfreq 11 -memlimit 1GB -ii at1MB -minidentity 80 -history 60
+# Start calculating k-mer frequency histogram...
+# ...finished histogram in 0.014254 seconds.
+# Set k-mer maximum frequency to 11, expect 460986 seed pairs.
+# Start building 460986 seed pairs...
+# ...collected 460986 seed pairs in 0.014815 seconds.
+# ...sorted 460986 seed pairs in 0.051007 seconds.
+# Start calculating k-mer frequency histogram...
+# ...finished histogram in 0.018111 seconds.
+# Set k-mer maximum frequency to 11, expect 321828 seed pairs.
+# Start building 321828 seed pairs...
+# ...collected 321828 seed pairs in 0.019132 seconds.
+# ...sorted 321828 seed pairs in 0.035238 seconds.
+# TIME seedextend-10-25 overall 0.152853

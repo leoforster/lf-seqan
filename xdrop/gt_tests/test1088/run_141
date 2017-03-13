@@ -1,0 +1,1 @@
+$CMD_PREFIX cut -f 1-3,5,8-10 -d ' ' stdout_140

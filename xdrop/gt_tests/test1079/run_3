@@ -1,0 +1,1 @@
+$CMD_PREFIX gunzip -c /home/lf/Desktop/projects/gfaproj/genometools/testdata/seedextend1.out.gz | cmp stdout_2

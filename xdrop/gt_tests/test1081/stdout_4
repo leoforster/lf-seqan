@@ -1,0 +1,22 @@
+# Options: -only-seeds -v -maxfreq 5 -ii at1MB -minidentity 80 -history 60
+# Start fetching 10-mers (expect 752857)...
+# ...found 622939 10-mers in 0.036352 seconds.
+# ...sorted 622939 10-mers in 0.061102 seconds.
+# Write 622939 10-mers to file at1MB.10r1-1.kmer
+# Start fetching 10-mers (expect 752857)...
+# ...found 622939 10-mers in 0.015485 seconds.
+# ...sorted 622939 10-mers in 0.055912 seconds.
+# Write 622939 10-mers to file at1MB.10f1-1.kmer
+# Start calculating k-mer frequency histogram...
+# ...finished histogram in 0.008225 seconds.
+# Set k-mer maximum frequency to 5, expect 305756 seed pairs.
+# Start building 305756 seed pairs...
+# ...collected 305756 seed pairs in 0.009785 seconds.
+# ...sorted 305756 seed pairs in 0.035199 seconds.
+# Start calculating k-mer frequency histogram...
+# ...finished histogram in 0.015222 seconds.
+# Set k-mer maximum frequency to 5, expect 235705 seed pairs.
+# Start building 235705 seed pairs...
+# ...collected 235705 seed pairs in 0.015563 seconds.
+# ...sorted 235705 seed pairs in 0.025712 seconds.
+# TIME seedextend-10-25 overall 0.288637
