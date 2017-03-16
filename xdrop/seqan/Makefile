@@ -10,7 +10,8 @@ MY_CXXFLAGS=-Wall -Werror -Wpedantic -O3 -fno-strict-aliasing -std=c++14
 
 MY_LDFLAGS=-ldl -lz -lbz2 ${RT} -lpthread ${FOLLY} ${LDFLAGS}
 EXECS=example.x \
-	extend.x 
+	extend.x \
+	test.x
 
 # the following does not work due to change of interface: blastread.x blastwrite.x
 
