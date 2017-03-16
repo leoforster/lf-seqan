@@ -1,69 +1,121 @@
 #include <fstream>
 #include <iostream>
+#include <assert.h>  
 
 #include <seqan/align.h>
 #include <seqan/align_extend.h>
 #include <seqan/sequence.h>
-//#include <seqan/arg_parse.h>
 #include <seqan/seq_io.h>
 
-//using namespace seqan;
+using namespace seqan;
+
+//todo: seed chaining 
+//http://docs.seqan.de/seqan/2.0.0/demos/seeds/seeds_chaining.cpp
+//http://seqan.readthedocs.io/en/master/Tutorial/Algorithms/SeedExtension.html
 
 int main(int argc, char const ** argv)
 {
-  //assert(argc == 3);
-  //const char* seqfile = argv[1];
-  //const char* seedfile = argv[2];
+  int i, j;
   
+  if (argc <= 3)
+    return 1;
 
+  int seqcount = atoi(argv[1]);
+  int seedcount = atoi(argv[2]);
   
-  //Align<Infix<CharString const>::Type> align;
-  //resize(rows(align), 2);
-  //int score = 0;
+  assert(argc >= 2 + seqcount + seedcount * 5);
   
-  //String<char> a = "SEEDabXcdXefXXX";
-  //String<char> b = "SEEDabYcdefYYYY";
+  StringSet<String<char> > seqs;
+  String<char> seq;
+  for (i = 3; i < 3 + seqcount; ++i)
+  {
+    seq = argv[i];
+    appendValue(seqs, seq);
+  }
   
-  //int left_a = 0; 
-  //int left_b = 0;
-  //int length = 4;
-  ////int right_a = left_a + length;
-  ////int right_b = left_b + length;
-  
-  //Seed<Simple> seed1(0, 0, 4);          //left=0; length=4
-  //Score<> scoring(1, -1, -1);
+  //Score<int, Simple> scoringScheme(1, -1, -1);
+  Score<int, Simple> scoring(0, 1, 1);
+  for (j = i; j < i + seedcount * 5; j = j + 5)
+  {
+    int sid = atoi(argv[j]);
+    int qid = atoi(argv[j + 1]);
+    int spos = atoi(argv[j + 2]);
+    int qpos = atoi(argv[j + 3]);
+    int len = atoi(argv[j + 4]);
+    
+    String<char> s = seqs[sid];
+    String<char> q = seqs[qid];
+    
+    //std::cout << s << std::endl;
+    //std::cout << q << std::endl;
+    
+    Seed<Simple> seed(spos, qpos, len);
+    //extendSeed(seed, s, q, EXTEND_BOTH, MatchExtend());
+    extendSeed(seed, s, q, EXTEND_BOTH, scoring, 6, GappedXDrop());
+    
+    //Align<Infix<CharString const>::Type> align;
+    Align<CharString> align;
+    AlignmentStats stats;
+    resize(rows(align), 2);
+    
+    assignSource(row(align, 0), infix(s, beginPositionH(seed), endPositionH(seed)));
+    assignSource(row(align, 1), infix(q, beginPositionV(seed), endPositionV(seed)));
+    
+    globalAlignment(align, scoring);
+    computeAlignmentStats(stats, align, scoring);
 
-  //assignSource(row(align, 0), infix(a, left_a, left_a + length));
-  //assignSource(row(align, 1), infix(b, left_b, left_b + length));
-  //score = globalAlignment(align, scoring);
-  
-  //std::cout << "Initial alignment (score == " << score << ")\n\n"
-            //<< align;
-  
-  ////extendSeed(seed, a, b, 1, MatchExtend());
-  ////extendSeed(seed1, a, b, EXTEND_BOTH, MatchExtend());
-  ////extendSeed(seed1, a, b, EXTEND_RIGHT, MatchExtend());
-  ////extendSeed(seed1, a, b, EXTEND_BOTH, scoring, 2, UnGappedXDrop());
-  //extendSeed(seed1, a, b, EXTEND_BOTH, scoring, 2, GappedXDrop());
-  
-  //length = endPositionH(seed1) - left_a;
-  //assignSource(row(align, 0), infix(a, left_a, left_a + length));
-  //assignSource(row(align, 1), infix(b, left_b, left_b + length));
-  //score = globalAlignment(align, scoring);
+    int slen = endPositionH(seed) - spos;
+    int qlen = endPositionV(seed) - qpos;
+    spos = beginPositionH(seed);
+    qpos = beginPositionV(seed);
+    char strand = '?'; //
+    int score = stats.alignmentScore;
+    int edist = stats.numPositiveScores; //stats.numNegativeScores?
+    int ident = stats.alignmentIdentity; //float vs int? decimal places?
 
-  //std::cout << "Resulting alignment (score == " << score << ")\n\n"
-            //<< align;
-
-  ////Seed<Simple> seed2(0, 0, 4);          //left=0; length=4
-  ////Score<> scoring(1, -1, -1);
-  ////extendSeed(seed2, a, b, EXTEND_BOTH, scoring, 2, UnGappedXDrop());
-  ////std::cout << "endPositionH(seed2) = " << endPositionH(seed2) << std::endl;
-  ////std::cout << "endPositionV(seed2) = " << endPositionV(seed2) << std::endl;
-
-  ////Seed<Simple> seed3(0, 0, 4);          //left=0; length=4
-  ////extendSeed(seed3, a, b, EXTEND_BOTH, scoring, 2, GappedXDrop());
-  ////std::cout << "endPositionH(seed3) = " << endPositionH(seed3) << std::endl;
-  ////std::cout << "endPositionV(seed3) = " << endPositionV(seed3) << std::endl;
-
+    //std::cout << "len " << slen << " "
+              //<< "sid " << sid << " "
+              //<< "spos " << spos << " "
+              //<< "strand" << strand << " "
+              //<< "qlen " << qlen << " "
+              //<< "qid " << qid << " "
+              //<< "qpos " << qpos << " "
+              //<< "score " << score << " "
+              //<< "edist " << edist << " "
+              //<< "ident " << ident << "\n";
+    std::cout << slen << " "
+              << sid << " "
+              << spos << " "
+              << strand << " "
+              << qlen << " "
+              << qid << " "
+              << qpos << " "
+              << score << " "
+              << edist << " "
+              << ident << "\n";
+  }
   return 0;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
