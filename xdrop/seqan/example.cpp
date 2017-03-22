@@ -1,54 +1,114 @@
-#include <iostream>
 
-#include <seqan/align.h>
-#include <seqan/align_extend.h>
-#include <seqan/sequence.h>
+//Listing 1: Global alignment computation.
+//----------------------------------------
 
-using namespace seqan;
+//#include <iostream>
+//#include <seqan/stream.h>
+//#include <seqan/align.h>
 
-int main()
-{
-    Score<int> sc(2, -1, -2);
+//using namespace seqan;
+//int main()
+//{
+  //StringSet<DnaString> stringSet;
 
-    Align<Infix<CharString const>::Type> align;
-    resize(rows(align), 2);
+  //appendValue(stringSet, "AGTTTAATCA");
+  //appendValue(stringSet, "AGTATACGA");
 
-    // We create the following initial situation with subject/query and the
-    // infixes thereof.
-    //
-    //                         infixes/seeds
-    //                             <-->
-    // subject  NNNNNNNNNNTTCCGGGACGGTACACACACGGGGGGGGGG
-    // query               CTCGGGACGGTACAGGCACGGTTTTTTTT
-    CharString subject = "NNNNNNNNNNTTCCGGGACGGTACACACACGGGGGGGGGG";
-    CharString query   = "CTCGGGACGGTACAGGCACGGTTTTTTTT";
-    assignSource(row(align, 0), infix(subject, 19, 23));
-    assignSource(row(align, 1), infix(query, 8, 12));
-    int score = globalAlignment(align, sc);
+  ////doesnt compile
+  ////Align<DnaString, AnchorGaps> align(stringSet);
+  ////compiles
+  //Align<DnaString> align(stringSet);
 
-    std::cout << "Initial alignment of infixes (score == " << score << ")\n\n"
-              << align;
+  //int score = globalAlignment(align, EditDistanceScore());
+  //std::cout << "Score :" << score << std::endl;
+  //std::cout << align << std::endl;
 
-    // The alignment starts at diagonal (23 - 19) = 4.  A band of 4 in each direction has
-    // the following diagonals.
-    int lDiag = 0, uDiag = 8;
-    // Set the x-Drop value to 5.
-    int xDrop = 5;
-    Tuple<unsigned, 4> positions = { {19u, 8u, 23u, 12u} };
-    score = extendAlignment(align, score, subject, query, positions, EXTEND_BOTH,
-                            lDiag, uDiag, xDrop, sc);
-
-    std::cout << "Resulting alignment (score == " << score << ")\n\n"
-              << align;
-
-    std::cout << "source(row(align, 0)) == " << source(row(align, 0)) << " (full sequence)\n"
-              << "source(row(align, 1)) == " << source(row(align, 1)) << " (full sequence)\n"
-              << "\n"
-              << "clipping positions of row 0: " << clippedBeginPosition(row(align, 0))
-              << ", " << clippedEndPosition(row(align, 0)) << "\n"
-              << "clipping positions of row 1: " << clippedBeginPosition(row(align, 1))
-              << ", " << clippedEndPosition(row(align, 1)) << "\n";
+  //return 0;
+//}
 
 
-    return 0;
-}
+
+//Listing 2: Searching with FM-indices
+//----------------------------------------
+
+//#include <iostream>
+//#include <seqan/find.h>
+//#include <seqan/index.h>
+
+//using namespace seqan;
+
+//int main()
+//{
+  //CharString hstck = "I spy with my little eye something that is yellow";
+  //Index<CharString, FMIndex<> > index(hstck);
+  //Finder<Index<CharString, FMIndex<> > > finder(hstck);
+
+  //while (find(finder, "y"))
+      //std::cout << "Hit at position: " << position(finder) << std::endl;
+
+  //clear(finder);
+
+  //while (find(finder, "t"))
+      //std::cout << "Hit at position: " << position(finder) << std::endl;
+//}
+//doesnt compile (but probably should): 
+//example.cpp:(.text+0x25): undefined reference to `aio_error'
+//example.cpp:(.text+0x9e): undefined reference to `aio_suspend'
+//example.cpp:(.text+0xb4): undefined reference to `aio_return'
+//In function `seqan::BufferHandler<seqan::Pool<seqan::Triple<unsigned long, ...
+
+
+
+//Listing 3: Reading and writing BAM files
+//----------------------------------------
+//#include <iostream>
+//#include <seqan/stream.h>
+//#include <seqan/bam_io.h>
+
+//using namespace seqan;
+
+//int main()
+//{
+  //BamFileIn bamFileIn;
+  ////doesnt compile
+  ////if (!open(bamFileIn, example.bam))
+  ////compiles
+  //if (!open(bamFileIn, "example.bam"))
+  //{
+    //std::cerr << "Can’t open the file." << std::endl;
+    //return 1;
+  //}
+  
+  //// Open output stream to stdcout .
+  //BamFileOut bamFileOut(bamFileIn);
+  //open(bamFileOut, std::cout, Sam());
+  
+  //// Copy header.
+  //BamHeader header;
+  //readHeader(header, bamFileIn);
+  //writeHeader(bamFileOut, header);
+
+  //// Copy records.
+  //BamAlignmentRecord record;
+  //while (!atEnd(bamFileIn))
+  //{
+      //readRecord(record, bamFileIn);
+      //writeRecord(bamFileOut, record);
+  //}
+
+  //return 0;
+//}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
