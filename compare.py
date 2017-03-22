@@ -107,10 +107,10 @@ def do_gt_extend(params):
   if params["do_xdrop"]: pstr += " -extendxdrop 100" 
   if params["do_greedy"]: pstr += " -extendgreedy 100" 
   if params["qfile"] != None: pstr += " -qii %s" %(params["qfile"]) 
-  pstr += " -seedlength %s" %(params["seedlen"])
-  #pstr += " -xdropbelow %s" %(params["xcutoff"])
-  #pstr += " -mincoverage %s" %(params["mincoverage"])
-  #pstr += " -minidentity %s" %(params["minidentity"])
+  if params["seedlen"]: pstr += " -seedlength %s" %(params["seedlen"])
+  #if params["xcutoff"]: pstr += " -xdropbelow %s" %(params["xcutoff"])
+  #if params["mincov"]: pstr += " -mincoverage %s" %(params["mincov"])
+  #if params["minid"]: pstr += " -minidentity %s" %(params["minid"])
   #temporary:
   pstr += " -no-reverse"
   
@@ -121,7 +121,6 @@ def do_gt_extend(params):
   except:
     print("failed to get seeds -- call was:\n ", call)
     sys.exit()
-    
   seeds = seeds.decode("utf-8").split("\n")
   return seeds
   
@@ -133,8 +132,7 @@ def run_with_seqan(seqan, infile, seedfile):
   except:
     print("failed to run seqan script -- call was:\n " %call)
     sys.exit()
-  #slice due to irregularities - should be temporary
-  extend = extend.decode("utf-8").split("\n")[:-2] 
+  extend = extend.decode("utf-8").split("\n")[:-2] #slice due to irregularities
   return extend
   
 def encode(infile):
