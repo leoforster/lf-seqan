@@ -12,88 +12,106 @@ using namespace seqan;
 //todo: seed chaining 
 //http://docs.seqan.de/seqan/2.0.0/demos/seeds/seeds_chaining.cpp
 //http://seqan.readthedocs.io/en/master/Tutorial/Algorithms/SeedExtension.html
+//Merge() ? see http://docs.seqan.de/seqan/2.1.0/class_SeedSet.html
+//handling failed seeds?
+
 
 int main(int argc, char const ** argv)
 {
-  int i, j;
-  
-  if (argc <= 3)
-    return 1;
+  int i;
+  StringSet<CharString> ids;
+  StringSet<CharString> seqs; //DnaString ?
 
-  int seqcount = atoi(argv[1]);
-  int seedcount = atoi(argv[2]);
-  
-  assert(argc >= 2 + seqcount + seedcount * 5);
-  
-  StringSet<String<char> > seqs;
-  String<char> seq;
-  for (i = 3; i < 3 + seqcount; ++i)
+  //check files exist
+  for (i = 1; i < 3; i++)
   {
-    seq = argv[i];
-    appendValue(seqs, seq);
+    if (FILE *file = std::fopen(argv[i], "r")) {
+      std::fclose(file);
+    } else {
+      std::cerr << "couldn't open file " << argv[i] << "\n";
+      return 1;
+    }
   }
   
-  //Score<int, Simple> scoringScheme(1, -1, -1);
-  Score<int, Simple> scoring(0, 1, 1);
-  for (j = i; j < i + seedcount * 5; j = j + 5)
+  const char* seqFile = argv[1];
+  const char* seedFile = argv[2];
+  //Score<int, Simple> scoring(0, 1, 1);
+  Score<int, Simple> scoring(1, -1, -1);
+  //Score<int> scoring(2, -1, -2);
+  
+  //parse sequences
+  SeqFileIn seqFileIn(seqFile);
+  readRecords(ids, seqs, seqFileIn);
+  
+  //typedef Iterator<StringSet<CharString>, Standard>::Type TIterator;
+  //for (TIterator it = begin(seqs, Standard()); it != end(seqs, Standard()); ++it)
+      //std::cout << position(it, seqs) << " " << *it << std::endl;
+  
+  //parse and extend seeds
+  std::ifstream infile(seedFile);
+  std::string fail, strand, sid, qid, spos, qpos, len;
+  while (infile.good()) //last newline gives repeated alignment
   {
-    int sid = atoi(argv[j]);
-    int qid = atoi(argv[j + 1]);
-    int spos = atoi(argv[j + 2]);
-    int qpos = atoi(argv[j + 3]);
-    int len = atoi(argv[j + 4]);
+    std::getline(infile, fail, ',');
+    std::getline(infile, strand, ',');
+    std::getline(infile, sid, ',');     
+    std::getline(infile, spos, ',');
+    std::getline(infile, qid, ','); 
+    std::getline(infile, qpos, ',');
+    std::getline(infile, len);
     
-    String<char> s = seqs[sid];
-    String<char> q = seqs[qid];
+    //Seed<Simple> seed(stoi(spos), stoi(qpos), stoi(len)); 
+    //consider seedSet -- what about sid and qid though?
+    String<char> s = seqs[stoi(sid)]; //CharString fails on compilation
+    String<char> q = seqs[stoi(qid)];
     
-    //std::cout << s << std::endl;
-    //std::cout << q << std::endl;
-    
-    Seed<Simple> seed(spos, qpos, len);
+    //cant use edit distance with gapped xdrop?
     //extendSeed(seed, s, q, EXTEND_BOTH, MatchExtend());
-    extendSeed(seed, s, q, EXTEND_BOTH, scoring, 6, GappedXDrop());
+    //extendSeed(seed, s, q, EXTEND_BOTH, scoring, 2, GappedXDrop());
+    //extendSeed(seed, s, q, EXTEND_BOTH, scoring, 6, UnGappedXDrop());
+    unsigned int sstart = stoi(spos);
+    unsigned int send = stoi(spos) + stoi(len);
+    unsigned int qstart = stoi(qpos);
+    unsigned int qend = stoi(qpos) + stoi(len);
     
-    //Align<Infix<CharString const>::Type> align;
-    Align<CharString> align;
+    Align<Infix<CharString const>::Type> align;
     AlignmentStats stats;
     resize(rows(align), 2);
     
-    assignSource(row(align, 0), infix(s, beginPositionH(seed), endPositionH(seed)));
-    assignSource(row(align, 1), infix(q, beginPositionV(seed), endPositionV(seed)));
+    assignSource(row(align, 0), infix(s, sstart, send));
+    assignSource(row(align, 1), infix(q, qstart, qend));
+    //assignSource(row(align, 0), infix(s, beginPositionH(seed), endPositionH(seed)));
+    //assignSource(row(align, 1), infix(q, beginPositionV(seed), endPositionV(seed)));
+    Tuple<unsigned, 4> positions = { {sstart, qstart, send, qend} };
+    extendAlignment(align, s, q, positions, EXTEND_BOTH, 2, scoring);
     
-    globalAlignment(align, scoring);
+    //globalAlignment(align, scoring);
     computeAlignmentStats(stats, align, scoring);
 
-    int slen = endPositionH(seed) - spos;
-    int qlen = endPositionV(seed) - qpos;
-    spos = beginPositionH(seed);
-    qpos = beginPositionV(seed);
-    char strand = '?'; //
+    //int slen = endPositionH(seed) - stoi(spos);
+    //int qlen = endPositionV(seed) - stoi(qpos);
+    //int spos_i = beginPositionH(seed);
+    //int qpos_i = beginPositionV(seed);
+    int slen = clippedEndPosition(row(align, 0)) - clippedBeginPosition(row(align, 0)) - 1;
+    int qlen = clippedEndPosition(row(align, 1)) - clippedBeginPosition(row(align, 1)) - 1;
+    int spos_i = clippedBeginPosition(row(align, 0));
+    int qpos_i = clippedBeginPosition(row(align, 1));
     int score = stats.alignmentScore;
     int edist = stats.numPositiveScores; //stats.numNegativeScores?
     int ident = stats.alignmentIdentity; //float vs int? decimal places?
 
-    //std::cout << "len " << slen << " "
-              //<< "sid " << sid << " "
-              //<< "spos " << spos << " "
-              //<< "strand" << strand << " "
-              //<< "qlen " << qlen << " "
-              //<< "qid " << qid << " "
-              //<< "qpos " << qpos << " "
-              //<< "score " << score << " "
-              //<< "edist " << edist << " "
-              //<< "ident " << ident << "\n";
     std::cout << slen << " "
               << sid << " "
-              << spos << " "
+              << spos_i << " "
               << strand << " "
               << qlen << " "
               << qid << " "
-              << qpos << " "
+              << qpos_i << " "
               << score << " "
               << edist << " "
               << ident << "\n";
   }
+
   return 0;
 }
 
