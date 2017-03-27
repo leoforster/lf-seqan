@@ -35,9 +35,7 @@ int main(int argc, char const ** argv)
   
   const char* seqFile = argv[1];
   const char* seedFile = argv[2];
-  //Score<int, Simple> scoring(0, 1, 1);
-  Score<int, Simple> scoring(1, -1, -1);
-  //Score<int> scoring(2, -1, -2);
+  Score<int> scoring(2, -1, -2);
   
   //parse sequences
   SeqFileIn seqFileIn(seqFile);
@@ -61,14 +59,13 @@ int main(int argc, char const ** argv)
     std::getline(infile, len);
     
     //Seed<Simple> seed(stoi(spos), stoi(qpos), stoi(len)); 
-    //consider seedSet -- what about sid and qid though?
-    String<char> s = seqs[stoi(sid)]; //CharString fails on compilation
-    String<char> q = seqs[stoi(qid)];
-    
-    //cant use edit distance with gapped xdrop?
     //extendSeed(seed, s, q, EXTEND_BOTH, MatchExtend());
     //extendSeed(seed, s, q, EXTEND_BOTH, scoring, 2, GappedXDrop());
     //extendSeed(seed, s, q, EXTEND_BOTH, scoring, 6, UnGappedXDrop());
+    
+    String<char> s = seqs[stoi(sid)]; //CharString fails on compilation
+    String<char> q = seqs[stoi(qid)];
+    
     unsigned int sstart = stoi(spos);
     unsigned int send = stoi(spos) + stoi(len);
     unsigned int qstart = stoi(qpos);
@@ -80,36 +77,38 @@ int main(int argc, char const ** argv)
     
     assignSource(row(align, 0), infix(s, sstart, send));
     assignSource(row(align, 1), infix(q, qstart, qend));
-    //assignSource(row(align, 0), infix(s, beginPositionH(seed), endPositionH(seed)));
-    //assignSource(row(align, 1), infix(q, beginPositionV(seed), endPositionV(seed)));
     Tuple<unsigned, 4> positions = { {sstart, qstart, send, qend} };
     extendAlignment(align, s, q, positions, EXTEND_BOTH, 2, scoring);
     
     //globalAlignment(align, scoring);
     computeAlignmentStats(stats, align, scoring);
 
-    //int slen = endPositionH(seed) - stoi(spos);
-    //int qlen = endPositionV(seed) - stoi(qpos);
-    //int spos_i = beginPositionH(seed);
-    //int qpos_i = beginPositionV(seed);
-    int slen = clippedEndPosition(row(align, 0)) - clippedBeginPosition(row(align, 0)) - 1;
-    int qlen = clippedEndPosition(row(align, 1)) - clippedBeginPosition(row(align, 1)) - 1;
-    int spos_i = clippedBeginPosition(row(align, 0));
-    int qpos_i = clippedBeginPosition(row(align, 1));
+    int new_slen = clippedEndPosition(row(align, 0)) - clippedBeginPosition(row(align, 0));
+    int new_qlen = clippedEndPosition(row(align, 1)) - clippedBeginPosition(row(align, 1));
+    int new_spos = clippedBeginPosition(row(align, 0));
+    int new_qpos = clippedBeginPosition(row(align, 1));
     int score = stats.alignmentScore;
     int edist = stats.numPositiveScores; //stats.numNegativeScores?
     int ident = stats.alignmentIdentity; //float vs int? decimal places?
 
-    std::cout << slen << " "
+    //std::cout << "# Fields: s.len, s.seqnum, s.start, strand, q.len, q.seqnum, "
+                  //" q.start, score, editdist, identity, seedlen, s.seedstart, "
+                  //"q.seedstart" << std::endl;
+
+    std::cout << new_slen << " " //lengths are off due to gaps?
               << sid << " "
-              << spos_i << " "
+              << new_spos << " "
               << strand << " "
-              << qlen << " "
+              << new_qlen << " "
               << qid << " "
-              << qpos_i << " "
+              << new_qpos << " "
               << score << " "
               << edist << " "
-              << ident << "\n";
+              << ident << " "
+              << len << " "
+              << spos << " "
+              << qpos << "\n";
+    //std::cout << align << std::endl;
   }
 
   return 0;

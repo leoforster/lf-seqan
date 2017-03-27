@@ -1,27 +1,48 @@
+#!/usr/bin/env python
+
 import sys
 import os
 import subprocess
 import argparse
+
+verbose = False
 
 #todo: mincov in seqan
 #todo: -maxmat and -l -> maximal matches of minimum length l
 #todo: chaining
 #todo: input an encoded file
 
-#todo: ouput option
-#todo: seedfile option
 #todo: option to compare successful seeds, failed seeds, or both
 def parse_opts():
-  parser = argparse.ArgumentParser()
-  parser.add_argument("-s", help="compiled seqan script location", type=str, required=True)
-  parser.add_argument("-i", help="input fasta file", type=str, required=True)
-  parser.add_argument("-q", help="input query fasta file for multiple comparison", type=str)
-  parser.add_argument("-seedlen", help="seedlength", type=int)
-  parser.add_argument("-mincov", help="minimum coverage for seed_extend", type=int)
-  parser.add_argument("-x", help="use xdrop algorithm for seed extension", action="store_true")
-  parser.add_argument("-g", help="use greedy algorithm for seed extension", action="store_true")
-  parser.add_argument("-xcut", help="xdrop cutoff score", type=int)
-  parser.add_argument("-minid", help="minimum identity of matches", type=int)
+  parser = argparse.ArgumentParser(
+    description="compare gt seed_extend seeds with those from the seqan library.")
+  parser.add_argument(
+    "-s", "--script", help="compiled seqan script location (required)",
+    type=str, required=True)
+  parser.add_argument(
+    "-i", "--input", help="input fasta file (required)", type=str, required=True)
+  parser.add_argument(
+    "-q", "--query", help="input query fasta file for multiple comparison", type=str)
+  parser.add_argument(
+    "-o", "--output", help="base name for saving output of gt and seqan seed extensions", type=str)
+  parser.add_argument(
+    "-l", "--seedlen", help="seedlength", type=int)
+  parser.add_argument(
+    "-p", "--seedfile", help="path of file to write seed information", type=str)
+  parser.add_argument(
+    "-n", "--mincov", help="minimum coverage for seed_extend", type=int)
+  parser.add_argument(
+    "-x", "--xdrop", help="use xdrop algorithm for seed extension", action="store_true")
+  parser.add_argument(
+    "-g", "--greedy", help="use greedy algorithm for seed extension", action="store_true")
+  parser.add_argument(
+    "-c", "--xcut", help="xdrop cutoff score", type=int)
+  parser.add_argument(
+    "-m", "--minid", help="minimum identity of matches for seed_extend", type=int)
+  parser.add_argument(
+    "--compare", help="use internal match comparison", action="store_true")
+  parser.add_argument(
+    "-v", "--verbose", help="generate additional output (verbose mode)", action="store_true")
   args = parser.parse_args()
   return args
   
@@ -30,59 +51,82 @@ def check_opts(args):
     "seqan":None,
     "infile":None,
     "qfile":None,
+    "outfile":None,
     "seedlen":None,
     "mincov":None,
     "minid":None,
     "do_xdrop":False,
     "do_greedy":False,
-    "xcutoff":None 
+    "xcutoff":None, 
+    "compare":False,
+    "seedfile":None
     }
-  
+
   #seqan
-  if args.s[0] == "/":
-    params["seqan"] = args.s
+  if args.script[0] == "/":
+    params["seqan"] = args.script
   else:
-    params["seqan"] = os.getcwd() + "/" + args.s
+    params["seqan"] = os.getcwd() + "/" + args.script
   #check if executable?
-  if not os.path.isfile(args.s):
-    print("failed to find %s - does it exist?" %args.s)
+  if not os.path.isfile(args.script):
+    print("failed to find %s - does it exist?" %args.script)
     sys.exit()
   
   #infile
-  if args.i[0] == "/":
-    params["infile"] = args.i
+  if args.input[0] == "/":
+    params["infile"] = args.input
   else:
-    params["infile"] = os.getcwd() + "/" + args.i
-  if not os.path.isfile(args.i):
-    print("failed to find %s - does it exist?" %args.i)
+    params["infile"] = os.getcwd() + "/" + args.input
+  if not os.path.isfile(args.input):
+    print("failed to find %s - does it exist?" %args.input)
     sys.exit()
       
+  #outfile
+  if args.output:
+    outpath = os.path.split(args.output)[0]
+    if os.path.exists(outpath) or outpath == "":
+      params["outfile"] = args.output
+  #else:
+    #params["outfile"] = "output_"
+      
   #query file
-  if args.q:
-    if args.q[0] == "/":
-      params["qfile"] = args.q
+  if args.query:
+    if args.query[0] == "/":
+      params["qfile"] = args.query
     else:
-      qfile = os.getcwd() + "/" + args.q
-    if not os.path.isfile(args.q):
-      print("failed to find %s - does it exist?" %args.q)
+      params["qfile"] + "/" + args.query
+    if not os.path.isfile(args.query):
+      print("failed to find %s - does it exist?" %args.query)
       sys.exit()
+      
+  #seedfile
+  if args.seedfile:
+    seedpath = os.path.split(args.seedfile)[0]
+    if os.path.exists(seedpath) or seedpath == "":
+      params["seedfile"] = args.seedfile
+  else:
+    params["seedfile"] = "seeds.txt"
 
   params["seedlen"] = args.seedlen if args.seedlen else 8
-  params["minid"] = args.minid if args.minid else 80
-  params["do_xdrop"] = True if args.x else False
-  params["do_greedy"] = True if args.g else False
-  if args.x:
-      params["xcutoff"] = args.xcut if args.xcut else 6
-
-  #xdrop, greedy exclusion
-  if args.x and args.g:
-    print("cannot have both -x and -g")
-    sys.exit()
-    
+  params["do_xdrop"] = True if args.xdrop else False
+  params["do_greedy"] = True if args.greedy else False
+  params["compare"] = True if args.compare else False
+  if args.xcut:
+    params["xcutoff"] = args.xcut
+  if args.minid:
+    params["minid"] = args.minid
   if args.mincov:
     params["mincov"] = args.mincov
-  else:
-    params["mincov"] = params["seedlen"] * 2.5 #float or int?
+
+  #xdrop, greedy exclusion
+  if args.xdrop and args.greedy:
+    print("cannot have both -x and -g")
+    sys.exit()
+
+  #verbose
+  if args.verbose:
+    global verbose 
+    verbose = True
 
   return params
   
@@ -103,35 +147,37 @@ def sequences_from_fasta(infile):
 
 def do_gt_extend(params):
   pstr = ""
-  
   if params["do_xdrop"]: pstr += " -extendxdrop 100" 
   if params["do_greedy"]: pstr += " -extendgreedy 100" 
   if params["qfile"] != None: pstr += " -qii %s" %(params["qfile"]) 
   if params["seedlen"]: pstr += " -seedlength %s" %(params["seedlen"])
-  #if params["xcutoff"]: pstr += " -xdropbelow %s" %(params["xcutoff"])
-  #if params["mincov"]: pstr += " -mincoverage %s" %(params["mincov"])
-  #if params["minid"]: pstr += " -minidentity %s" %(params["minid"])
+  if params["xcutoff"]: pstr += " -xdropbelow %s" %(params["xcutoff"])
+  if params["mincov"]: pstr += " -mincoverage %s" %(params["mincov"])
+  if params["minid"]: pstr += " -minidentity %s" %(params["minid"])
   #temporary:
-  pstr += " -no-reverse"
-  
+  #pstr += " -no-reverse"
   call = "gt seed_extend -ii %s %s -outfmt seed failed_seed" %(params["infile"], pstr)
-  #print(call)
+  
   try:
     seeds = subprocess.check_output([call], shell=True, stderr=subprocess.STDOUT)
   except:
-    print("failed to get seeds -- call was:\n ", call)
+    print("failed to get seeds -- call was:\n " + call)
     sys.exit()
+  if verbose: print(call)
+  
   seeds = seeds.decode("utf-8").split("\n")
   return seeds
   
 def run_with_seqan(seqan, infile, seedfile):
   call = "%s %s %s" %(seqan, infile, seedfile) #todo: how to handle other options in seqan-file?
-  #print(call)
+  
   try:
     extend = subprocess.check_output([call], shell=True, stderr=subprocess.STDOUT)
   except:
-    print("failed to run seqan script -- call was:\n " %call)
+    print("failed to run seqan script -- call was:\n " + call)
     sys.exit()
+  if verbose: print(call)
+  
   extend = extend.decode("utf-8").split("\n")[:-2] #slice due to irregularities
   return extend
   
@@ -169,26 +215,51 @@ def seeds_to_file(seedfile, seeds):
       #assert(type(s) == Seed)
       f.write(s.to_line())
 
+def compare_matches(gt_matches, sq_matches, total, thresh=0.8):
+  assert(total > 0)
+  matchcount = 0
+  
+  print("matching extensions:")
+  for gt in gt_matches:
+    for sq in sq_matches:
+      if gt.compatible(sq):
+        if gt.equivalent(sq):
+          matchcount += 1
+          if verbose: print("\tgt: %s\n\tsq: %s\n" %(gt.to_line(), sq.to_line()))
+        else:
+          olap = ExtendedSeed.overlap_score(gt, sq)
+          if olap > thresh:
+            matchcount += 1
+            if verbose: print("\tgt: %s\n\tsq: %s\n\t%.2f%% overlapping\n" 
+                              %(gt.to_line(), sq.to_line(), olap * 100))
+  if matchcount == 0:
+    print("\tnone")
+  else:
+    print("\t%s seeds match (%.2f percent of total)" %(matchcount, 
+                                        (float(matchcount)/total)*100))
+
 class ExtendedSeed:
   def __init__(self, sl, s, spos, strand, ql, q, qpos, score, edist, ident):
     #check spos <= slen && qpos <= qlen ?
-    self.slen = sl
-    self.s = s
-    self.spos = spos
+    self.slen = int(sl)
+    self.s = int(s)
+    self.spos = int(spos)
+    self.send = self.spos + self.slen
     self.strand = strand
-    self.qlen = ql
-    self.q = q
-    self.qpos = qpos
-    self.score = score
-    self.edist = edist
-    self.ident = ident
+    self.qlen = int(ql)
+    self.q = int(q)
+    self.qpos = int(qpos)
+    self.qend = self.qpos + self.qlen
+    self.score = int(score)
+    self.edist = int(edist)
+    self.ident = float(ident)
     
   @classmethod
   def from_string(cls, line):
     sl, s, spos, strand, ql, q, qpos, score, edist, ident = line.split(" ")[:10]
     return cls(sl, s, spos, strand, ql, q, qpos, score, edist, ident)
     
-  def compare_seeds(self, other, skip=[]):
+  def equivalent(self, other, skip=[]):
     if (self.slen == other.slen and 
         self.s == other.s and
         self.spos == other.spos and
@@ -201,7 +272,38 @@ class ExtendedSeed:
        #self.ident == other.ident:
          return True
     return False
-    
+  
+  def compatible(self, other, lenthresh=10, posthresh=25):
+    return ((self.s == other.s and self.q == other.q) and
+            (abs(self.slen - other.slen) <= lenthresh and 
+             abs(self.qlen - other.qlen) <= lenthresh) and
+            (abs(self.spos - other.spos) <= posthresh and
+             abs(self.qpos - other.qpos) <= posthresh))
+
+  @staticmethod
+  def get_overlap_length(spos, send, opos, oend):
+    olap = 0
+    if spos > opos:
+      if send > oend:
+        olap = oend - spos
+      else:
+        olap = send - spos
+    else:
+      if oend > send:
+        olap = send - opos
+      else:
+        olap = oend - opos
+    return abs(olap)
+  
+  def overlap_score(self, other):
+    solap = ExtendedSeed.get_overlap_length(self.spos, self.send, other.spos, other.send)
+    qolap = ExtendedSeed.get_overlap_length(self.qpos, self.qend, other.qpos, other.qend)
+    #biased due to seedlength being counted (it always overlaps)
+    return ((float(solap)/self.slen + 
+             float(solap)/other.slen + 
+             float(qolap)/self.qlen + 
+             float(qolap)/other.qlen) / 4)
+
   def to_line(self):
     return "%s %s %s %s %s %s %s %s %s %s" %(self.slen, self.s, self.spos, 
                                              self.strand, self.qlen, self.q,
@@ -217,6 +319,9 @@ class Seed:
     self.q = q
     self.qpos = qpos
     self.l = l
+    
+  def is_failed(self):
+    return self.fail
 
   def to_line(self):
     return "%s,%s,%s,%s,%s,%s,%s\n" %("-" if self.fail else "+", 
@@ -224,7 +329,7 @@ class Seed:
                                       self.q, self.qpos, self.l)
 
 
-def main():
+def main():  
   opts = parse_opts()
   params = check_opts(opts)
   
@@ -232,28 +337,40 @@ def main():
   seeds = do_gt_extend(params)
   succ, fail, gt_extend = parse_seeds(seeds)
   
-  seeds_to_file("seeds.txt", succ)
-  sq_out = run_with_seqan(params["seqan"], params["infile"], "seeds.txt")
+  if len(succ) == 0:
+    print("no seeds were successfully extended")
+    return 1
   
+  seeds_to_file(params["seedfile"], succ)
+  sq_out = run_with_seqan(params["seqan"], params["infile"], params["seedfile"])
+
   sq_extend = []
   for s in sq_out:
     sq_extend.append(ExtendedSeed.from_string(s))
   
-  print("got %s seeds from gt (%s success, %s fail)" %(len(succ + fail), len(succ), len(fail)))
-    
-  matchcount = 0
-  print("matching extensions:")
-  for gt in gt_extend:
-    for sq in sq_extend:
-      if gt.compare_seeds(sq, ["score", "edist", "ident"]):
-        matchcount += 1
-        print("\tgt: %s\n\tsq: %s\n" %(gt.to_line(), sq.to_line()))
-  if matchcount == 0:
-    print("none")
-  else:
-    print("%s seeds match (%.2f percent of total)" %(matchcount, 
-                                        (float(matchcount)/len(succ))*100))
+  if params["compare"]:
+    print("got %s seeds from gt (%s success, %s fail)" %(len(succ + fail), len(succ), len(fail)))
+    compare_matches(gt_extend, sq_extend, len(succ))
+
+  fields = "# Fields: s.len, s.seqnum, s.start, strand, q.len, q.seqnum, "\
+             "q.start, score, editdist, identity\n" #, seedlen, s.seedstart, q.seedstart\n"
   
+  if params["outfile"]:
+    for suff in ["_gt", "_sq"]:
+      with open(params["outfile"] + suff, "w") as f:
+        f.write(fields)
+        extend = sq_extend if suff == "_sq" else gt_extend
+        for s in extend:
+          f.write(s.to_line() + "\n")
+  elif not params["compare"]:
+    for i in range(2):
+      print(fields)
+      extend = sq_extend if i == 1 else gt_extend
+      for s in extend:
+        print(s.to_line() + "\n")
+      if i == 0:
+        print("\n\n")
+
   return 0
   
   
