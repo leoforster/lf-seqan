@@ -55,7 +55,7 @@ def check_opts(args):
     "seedlen":None,
     "mincov":None,
     "minid":None,
-    "do_xdrop":False,
+    "do_xdrop":True, #default!
     "do_greedy":False,
     "xcutoff":None, 
     "compare":False,
@@ -94,7 +94,7 @@ def check_opts(args):
     if args.query[0] == "/":
       params["qfile"] = args.query
     else:
-      params["qfile"] + "/" + args.query
+      params["qfile"] = os.getcwd() + "/" + args.query
     if not os.path.isfile(args.query):
       print("failed to find %s - does it exist?" %args.query)
       sys.exit()
@@ -108,7 +108,7 @@ def check_opts(args):
     params["seedfile"] = "seeds.txt"
 
   params["seedlen"] = args.seedlen if args.seedlen else 8
-  params["do_xdrop"] = True if args.xdrop else False
+  params["do_xdrop"] = False if args.xdrop else True #default: do xdrop !
   params["do_greedy"] = True if args.greedy else False
   params["compare"] = True if args.compare else False
   if args.xcut:
@@ -119,9 +119,9 @@ def check_opts(args):
     params["mincov"] = args.mincov
 
   #xdrop, greedy exclusion
-  if args.xdrop and args.greedy:
-    print("cannot have both -x and -g")
-    sys.exit()
+  #if args.xdrop and args.greedy:
+    #print("cannot have both -x and -g")
+    #sys.exit()
 
   #verbose
   if args.verbose:
@@ -147,15 +147,16 @@ def sequences_from_fasta(infile):
 
 def do_gt_extend(params):
   pstr = ""
-  if params["do_xdrop"]: pstr += " -extendxdrop 100" 
-  if params["do_greedy"]: pstr += " -extendgreedy 100" 
+  if params["do_xdrop"]: pstr += " -extendxdrop" 
+  if params["do_greedy"]: pstr += " -extendgreedy" 
   if params["qfile"] != None: pstr += " -qii %s" %(params["qfile"]) 
   if params["seedlen"]: pstr += " -seedlength %s" %(params["seedlen"])
   if params["xcutoff"]: pstr += " -xdropbelow %s" %(params["xcutoff"])
   if params["mincov"]: pstr += " -mincoverage %s" %(params["mincov"])
   if params["minid"]: pstr += " -minidentity %s" %(params["minid"])
   #temporary:
-  #pstr += " -no-reverse"
+  pstr += " -no-reverse"
+  
   call = "gt seed_extend -ii %s %s -outfmt seed failed_seed" %(params["infile"], pstr)
   
   try:
@@ -168,8 +169,11 @@ def do_gt_extend(params):
   seeds = seeds.decode("utf-8").split("\n")
   return seeds
   
-def run_with_seqan(seqan, infile, seedfile):
-  call = "%s %s %s" %(seqan, infile, seedfile) #todo: how to handle other options in seqan-file?
+def run_with_seqan(seqan, seedfile, infile, qfile = None):
+  if qfile:
+    call = "%s 2 %s %s %s" %(seqan, seedfile, infile, qfile)
+  else:
+    call = "%s 1 %s %s" %(seqan, seedfile, infile)
   
   try:
     extend = subprocess.check_output([call], shell=True, stderr=subprocess.STDOUT)
@@ -342,7 +346,11 @@ def main():
     return 1
   
   seeds_to_file(params["seedfile"], succ)
-  sq_out = run_with_seqan(params["seqan"], params["infile"], params["seedfile"])
+  if params["qfile"]:
+    sq_out = run_with_seqan(params["seqan"], params["seedfile"], 
+                            params["infile"], params["qfile"])
+  else:
+    sq_out = run_with_seqan(params["seqan"], params["seedfile"], params["infile"])
 
   sq_extend = []
   for s in sq_out:
@@ -353,12 +361,12 @@ def main():
     compare_matches(gt_extend, sq_extend, len(succ))
 
   fields = "# Fields: s.len, s.seqnum, s.start, strand, q.len, q.seqnum, "\
-             "q.start, score, editdist, identity\n" #, seedlen, s.seedstart, q.seedstart\n"
+             "q.start, score, editdist, identity" #, seedlen, s.seedstart, q.seedstart\n"
   
   if params["outfile"]:
     for suff in ["_gt", "_sq"]:
       with open(params["outfile"] + suff, "w") as f:
-        f.write(fields)
+        f.write(fields + "\n")
         extend = sq_extend if suff == "_sq" else gt_extend
         for s in extend:
           f.write(s.to_line() + "\n")
@@ -367,7 +375,7 @@ def main():
       print(fields)
       extend = sq_extend if i == 1 else gt_extend
       for s in extend:
-        print(s.to_line() + "\n")
+        print(s.to_line())
       if i == 0:
         print("\n\n")
 

@@ -1,6 +1,5 @@
 #include <fstream>
 #include <iostream>
-#include <assert.h>  
 
 #include <seqan/align.h>
 #include <seqan/align_extend.h>
@@ -15,35 +14,61 @@ using namespace seqan;
 //Merge() ? see http://docs.seqan.de/seqan/2.1.0/class_SeedSet.html
 //handling failed seeds?
 
-
 int main(int argc, char const ** argv)
 {
-  int i;
+  int i = 0, j = 0;
   StringSet<CharString> ids;
-  StringSet<CharString> seqs; //DnaString ?
+  StringSet<CharString> seqs, quer; //DnaString ?
+  Score<int> scoring(2, -1, -2);
+  
+  //assert(argc >= 4);
+  int filecount = atoi(argv[1]);
+  if (filecount == 0) 
+  {
+    std::cerr << "couldn't convert \"" << argv[1] << "\"\n";
+    return 1;
+  }
+  else 
+  {
+    filecount == 1 ? j = 3 : j = 4;
+  }
 
   //check files exist
-  for (i = 1; i < 3; i++)
+  for (i = 2; i < j; i++)
   {
-    if (FILE *file = std::fopen(argv[i], "r")) {
+    if (FILE *file = std::fopen(argv[i], "r")) 
+    {
       std::fclose(file);
-    } else {
+    } else 
+    {
       std::cerr << "couldn't open file " << argv[i] << "\n";
       return 1;
     }
   }
   
-  const char* seqFile = argv[1];
   const char* seedFile = argv[2];
-  Score<int> scoring(2, -1, -2);
-  
+  const char* seqFile = argv[3];
+  const char* qerFile = NULL;
+  if (filecount == 2)
+    qerFile = argv[4];
+
   //parse sequences
   SeqFileIn seqFileIn(seqFile);
   readRecords(ids, seqs, seqFileIn);
+  if (filecount > 1)
+  {
+    SeqFileIn seqFileIn(qerFile);
+    readRecords(ids, quer, seqFileIn);
+  }
   
   //typedef Iterator<StringSet<CharString>, Standard>::Type TIterator;
   //for (TIterator it = begin(seqs, Standard()); it != end(seqs, Standard()); ++it)
       //std::cout << position(it, seqs) << " " << *it << std::endl;
+      //std::cout << position(it, seqs) << std::endl;
+      
+  //for (TIterator it = begin(quer, Standard()); it != end(quer, Standard()); ++it)
+    //std::cout << position(it, seqs) << " " << *it << std::endl;
+    //std::cout << position(it, seqs) << std::endl;
   
   //parse and extend seeds
   std::ifstream infile(seedFile);
@@ -63,8 +88,12 @@ int main(int argc, char const ** argv)
     //extendSeed(seed, s, q, EXTEND_BOTH, scoring, 2, GappedXDrop());
     //extendSeed(seed, s, q, EXTEND_BOTH, scoring, 6, UnGappedXDrop());
     
-    String<char> s = seqs[stoi(sid)]; //CharString fails on compilation
-    String<char> q = seqs[stoi(qid)];
+    String<char> q;
+    String<char> s = seqs[stoi(sid)];
+    if (filecount == 1)
+      q = seqs[stoi(qid)];
+    else
+      q = quer[stoi(qid)];
     
     unsigned int sstart = stoi(spos);
     unsigned int send = stoi(spos) + stoi(len);
@@ -88,7 +117,7 @@ int main(int argc, char const ** argv)
     int new_spos = clippedBeginPosition(row(align, 0));
     int new_qpos = clippedBeginPosition(row(align, 1));
     int score = stats.alignmentScore;
-    int edist = stats.numPositiveScores; //stats.numNegativeScores?
+    int edist = 0;//stats.numPositiveScores; //stats.numNegativeScores?
     int ident = stats.alignmentIdentity; //float vs int? decimal places?
 
     //std::cout << "# Fields: s.len, s.seqnum, s.start, strand, q.len, q.seqnum, "
