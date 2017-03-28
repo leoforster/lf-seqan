@@ -121,7 +121,8 @@ int main(int argc, char const ** argv)
     int new_slen = clippedEndPosition(row(align, 0)) - clippedBeginPosition(row(align, 0));
     int new_qlen = clippedEndPosition(row(align, 1)) - clippedBeginPosition(row(align, 1));
     int new_spos = clippedBeginPosition(row(align, 0));
-    int new_qpos = beginPosition(q) + (endPosition(q) - clippedBeginPosition(row(align, 1)));
+    //int new_qpos = beginPosition(q) + (endPosition(q) - clippedBeginPosition(row(align, 1)));
+    int new_qpos = clippedBeginPosition(row(align, 1));
     int score = stats.alignmentScore;
     int edist = stats.numMatches; //stats.numNegativeScores?
     int ident = stats.alignmentIdentity; //float vs int? decimal places?
@@ -143,7 +144,7 @@ int main(int argc, char const ** argv)
               << len << " "
               << spos << " "
               << qpos << "\n";
-    std::cout << align << std::endl;
+    //std::cout << align << std::endl;
   }
 
   return 0;
