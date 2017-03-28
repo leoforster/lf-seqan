@@ -5,6 +5,7 @@
 #include <seqan/align_extend.h>
 #include <seqan/sequence.h>
 #include <seqan/seq_io.h>
+#include <seqan/modifier.h>
 
 using namespace seqan;
 
@@ -62,13 +63,8 @@ int main(int argc, char const ** argv)
   }
   
   //typedef Iterator<StringSet<CharString>, Standard>::Type TIterator;
-  //for (TIterator it = begin(seqs, Standard()); it != end(seqs, Standard()); ++it)
-      //std::cout << position(it, seqs) << " " << *it << std::endl;
-      //std::cout << position(it, seqs) << std::endl;
-      
   //for (TIterator it = begin(quer, Standard()); it != end(quer, Standard()); ++it)
     //std::cout << position(it, seqs) << " " << *it << std::endl;
-    //std::cout << position(it, seqs) << std::endl;
   
   //parse and extend seeds
   std::ifstream infile(seedFile);
@@ -87,18 +83,28 @@ int main(int argc, char const ** argv)
     //extendSeed(seed, s, q, EXTEND_BOTH, MatchExtend());
     //extendSeed(seed, s, q, EXTEND_BOTH, scoring, 2, GappedXDrop());
     //extendSeed(seed, s, q, EXTEND_BOTH, scoring, 6, UnGappedXDrop());
+    String<char> s, q;
+    s = seqs[stoi(sid)];
+    filecount == 1 ? q = seqs[stoi(qid)] : q = quer[stoi(qid)];
+    toUpper(s);
+    toUpper(q);
     
-    String<char> q;
-    String<char> s = seqs[stoi(sid)];
-    if (filecount == 1)
-      q = seqs[stoi(qid)];
-    else
-      q = quer[stoi(qid)];
-    
+    //unsure
+    if (strand == "P")
+      reverseComplement(q);
+
     unsigned int sstart = stoi(spos);
     unsigned int send = stoi(spos) + stoi(len);
-    unsigned int qstart = stoi(qpos);
-    unsigned int qend = stoi(qpos) + stoi(len);
+    unsigned int qstart, qend;
+    if (strand == "P")
+    {
+      qstart = beginPosition(q) + (endPosition(q) - stoi(qpos));
+      qend = beginPosition(q) + (endPosition(q) - stoi(qpos) + stoi(len));
+    } else
+    {
+      qstart = stoi(qpos);
+      qend = stoi(qpos) + stoi(len);
+    }
     
     Align<Infix<CharString const>::Type> align;
     AlignmentStats stats;
@@ -117,7 +123,7 @@ int main(int argc, char const ** argv)
     int new_spos = clippedBeginPosition(row(align, 0));
     int new_qpos = clippedBeginPosition(row(align, 1));
     int score = stats.alignmentScore;
-    int edist = 0;//stats.numPositiveScores; //stats.numNegativeScores?
+    int edist = stats.numMatches; //stats.numNegativeScores?
     int ident = stats.alignmentIdentity; //float vs int? decimal places?
 
     //std::cout << "# Fields: s.len, s.seqnum, s.start, strand, q.len, q.seqnum, "

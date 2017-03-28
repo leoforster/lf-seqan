@@ -32,7 +32,7 @@ def parse_opts():
   parser.add_argument(
     "-n", "--mincov", help="minimum coverage for seed_extend", type=int)
   parser.add_argument(
-    "-x", "--xdrop", help="use xdrop algorithm for seed extension", action="store_true")
+    "-y", "--noxdrop", help="dont use xdrop algorithm for seed extension", action="store_true")
   parser.add_argument(
     "-g", "--greedy", help="use greedy algorithm for seed extension", action="store_true")
   parser.add_argument(
@@ -108,7 +108,7 @@ def check_opts(args):
     params["seedfile"] = "seeds.txt"
 
   params["seedlen"] = args.seedlen if args.seedlen else 8
-  params["do_xdrop"] = False if args.xdrop else True #default: do xdrop !
+  params["do_xdrop"] = False if args.noxdrop else True #default: do xdrop !
   params["do_greedy"] = True if args.greedy else False
   params["compare"] = True if args.compare else False
   if args.xcut:
@@ -154,10 +154,9 @@ def do_gt_extend(params):
   if params["xcutoff"]: pstr += " -xdropbelow %s" %(params["xcutoff"])
   if params["mincov"]: pstr += " -mincoverage %s" %(params["mincov"])
   if params["minid"]: pstr += " -minidentity %s" %(params["minid"])
-  #temporary:
-  pstr += " -no-reverse"
   
-  call = "gt seed_extend -ii %s %s -outfmt seed failed_seed" %(params["infile"], pstr)
+  #with -outfmt: failed_seed alignment
+  call = "gt seed_extend -ii %s %s -outfmt seed" %(params["infile"], pstr)
   
   try:
     seeds = subprocess.check_output([call], shell=True, stderr=subprocess.STDOUT)
@@ -243,13 +242,15 @@ def compare_matches(gt_matches, sq_matches, total, thresh=0.8):
                                         (float(matchcount)/total)*100))
 
 class ExtendedSeed:
+  forward_seeds = []
+  reverse_seeds = []
+  
   def __init__(self, sl, s, spos, strand, ql, q, qpos, score, edist, ident):
     #check spos <= slen && qpos <= qlen ?
     self.slen = int(sl)
     self.s = int(s)
     self.spos = int(spos)
     self.send = self.spos + self.slen
-    self.strand = strand
     self.qlen = int(ql)
     self.q = int(q)
     self.qpos = int(qpos)
@@ -257,17 +258,29 @@ class ExtendedSeed:
     self.score = int(score)
     self.edist = int(edist)
     self.ident = float(ident)
+    if strand == "P":
+      self.rev = True
+      ExtendedSeed.reverse_seeds.append(self)
+    else:
+      self.rev = False
+      ExtendedSeed.forward_seeds.append(self)
     
   @classmethod
   def from_string(cls, line):
     sl, s, spos, strand, ql, q, qpos, score, edist, ident = line.split(" ")[:10]
     return cls(sl, s, spos, strand, ql, q, qpos, score, edist, ident)
     
+  def get_forward_seeds():
+    return forward_seeds
+    
+  def get_reverse_seeds():
+    return reverse_seeds
+    
   def equivalent(self, other, skip=[]):
     if (self.slen == other.slen and 
         self.s == other.s and
         self.spos == other.spos and
-        self.strand == other.strand and
+        self.rev == other.rev and
         self.qlen == other.qlen and
         self.q == other.q and
         self.qpos == other.qpos): #and
@@ -309,28 +322,30 @@ class ExtendedSeed:
              float(qolap)/other.qlen) / 4)
 
   def to_line(self):
-    return "%s %s %s %s %s %s %s %s %s %s" %(self.slen, self.s, self.spos, 
-                                             self.strand, self.qlen, self.q,
-                                             self.qpos, self.score, self.edist,
+    return "%s %s %s %s %s %s %s %s %s %s" %(self.slen, self.s, self.spos,
+                                             "P" if self.rev else "F", 
+                                             self.qlen, self.q, self.qpos, 
+                                             self.score, self.edist,
                                              self.ident)
 
 class Seed:
   def __init__(self, fail, strand, s, spos, q, qpos, l):
     self.fail = fail
-    self.strand = strand
     self.s = s
     self.spos = spos
     self.q = q
     self.qpos = qpos
     self.l = l
+    self.rev = (strand == "P")
     
   def is_failed(self):
     return self.fail
 
   def to_line(self):
-    return "%s,%s,%s,%s,%s,%s,%s\n" %("-" if self.fail else "+", 
-                                      self.strand, self.s, self.spos, 
-                                      self.q, self.qpos, self.l)
+    return "%s,%s,%s,%s,%s,%s,%s\n" %("-" if self.fail else "+",
+                                      "P" if self.rev else "F",
+                                      self.s, self.spos, self.q, 
+                                      self.qpos, self.l)
 
 
 def main():  
@@ -378,6 +393,7 @@ def main():
         print(s.to_line())
       if i == 0:
         print("\n\n")
+  #2nd fields entry before reverse seeds isnt printed here
 
   return 0
   
