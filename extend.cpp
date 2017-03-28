@@ -96,15 +96,15 @@ int main(int argc, char const ** argv)
     unsigned int sstart = stoi(spos);
     unsigned int send = stoi(spos) + stoi(len);
     unsigned int qstart, qend;
-    if (strand == "P")
-    {
-      qstart = beginPosition(q) + (endPosition(q) - stoi(qpos));
-      qend = beginPosition(q) + (endPosition(q) - stoi(qpos) + stoi(len));
-    } else
-    {
+    //if (strand == "P")
+    //{
+      //qstart = beginPosition(q) + (endPosition(q) - stoi(qpos));
+      //qend = beginPosition(q) + (endPosition(q) - stoi(qpos) + stoi(len));
+    //} else
+    //{
       qstart = stoi(qpos);
       qend = stoi(qpos) + stoi(len);
-    }
+    //}
     
     Align<Infix<CharString const>::Type> align;
     AlignmentStats stats;
@@ -121,7 +121,7 @@ int main(int argc, char const ** argv)
     int new_slen = clippedEndPosition(row(align, 0)) - clippedBeginPosition(row(align, 0));
     int new_qlen = clippedEndPosition(row(align, 1)) - clippedBeginPosition(row(align, 1));
     int new_spos = clippedBeginPosition(row(align, 0));
-    int new_qpos = clippedBeginPosition(row(align, 1));
+    int new_qpos = beginPosition(q) + (endPosition(q) - clippedBeginPosition(row(align, 1)));
     int score = stats.alignmentScore;
     int edist = stats.numMatches; //stats.numNegativeScores?
     int ident = stats.alignmentIdentity; //float vs int? decimal places?
@@ -143,7 +143,7 @@ int main(int argc, char const ** argv)
               << len << " "
               << spos << " "
               << qpos << "\n";
-    //std::cout << align << std::endl;
+    std::cout << align << std::endl;
   }
 
   return 0;
