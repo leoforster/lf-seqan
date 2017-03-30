@@ -168,7 +168,7 @@ def do_gt_extend(params):
   except:
     print("failed to get seeds -- call was:\n " + call)
     sys.exit()
-  if verbose: print(call)
+  if verbose: print("call was:\n", call)
   
   seeds = seeds.decode("utf-8").split("\n")
   return seeds
@@ -184,7 +184,7 @@ def run_with_seqan(seqan, seedfile, infile, qfile = None):
   except:
     print("failed to run seqan script -- call was:\n " + call)
     sys.exit()
-  if verbose: print(call)
+  if verbose: print("call was:\n", call)
   
   extend = extend.decode("utf-8").split("\n")[:-2] #slice due to irregularities
   return extend
@@ -237,7 +237,7 @@ def compare_matches(gt_matches, sq_matches, total, thresh=0.8):
           if olap > thresh:
             matchcount += 1
             if verbose: print("\tgt: %s\n\tsq: %s\n\t%.2f%% overlapping\n" 
-                              %(gt.to_line(), sq.to_line(), olap * 100))
+                              %(gt.to_line(True), sq.to_line(True), olap * 100))
   if matchcount == 0:
     print("\tnone")
   else:
@@ -444,7 +444,7 @@ def main():
   if params["printseeds"]:
     fields += ", seedlen, s.seedstart, q.seedstart"
   
-  if verbose: print("output:")
+  if verbose and not params["outfile"]: print("output:")
   if params["outfile"]:
     for suff in ["_gt", "_sq"]:
       with open(params["outfile"] + suff, "w") as f:
