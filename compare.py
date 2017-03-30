@@ -20,7 +20,8 @@ def parse_opts():
     "-s", "--script", help="compiled seqan script location (required)",
     type=str, required=True)
   parser.add_argument(
-    "-i", "--input", help="input fasta file (required)", type=str, required=True)
+    "-i", "--input", help="input fasta file (required) -- should contain" \
+    " more than one input sequence", type=str, required=True)
   parser.add_argument(
     "-q", "--query", help="input query fasta file for multiple comparison", type=str)
   parser.add_argument(
@@ -39,6 +40,8 @@ def parse_opts():
     "-c", "--xcut", help="xdrop cutoff score", type=int)
   parser.add_argument(
     "-m", "--minid", help="minimum identity of matches for seed_extend", type=int)
+  parser.add_argument(
+    "--printseeds", help="print seeds to output (can be used with -o)", action="store_true")
   parser.add_argument(
     "--compare", help="use internal match comparison", action="store_true")
   parser.add_argument(
@@ -59,7 +62,8 @@ def check_opts(args):
     "do_greedy":False,
     "xcutoff":None, 
     "compare":False,
-    "seedfile":None
+    "seedfile":None,
+    "printseeds":False
     }
 
   #seqan
@@ -111,6 +115,7 @@ def check_opts(args):
   params["do_xdrop"] = False if args.noxdrop else True #default: do xdrop !
   params["do_greedy"] = True if args.greedy else False
   params["compare"] = True if args.compare else False
+  params["printseeds"] = True if args.printseeds else False
   if args.xcut:
     params["xcutoff"] = args.xcut
   if args.minid:
@@ -199,18 +204,16 @@ def decode(infile):
 def parse_seeds(seeds):
   realseeds = []
   failseeds = []
-  gt_extend = []
   for s in seeds:
     if s != "":
       if s.startswith("#"):
         if s.startswith("# failed_seed"):
           s = s.split("\t")
           failseeds.append(Seed(True, s[4], s[2], s[3], s[5], s[6], s[1]))
-      else:
-        gt_extend.append(ExtendedSeed.from_string(s))
-        s = s.split(" ")
-        realseeds.append(Seed(False, s[3], s[1], s[11], s[5], s[12], s[10]))
-  return (realseeds, failseeds, gt_extend)
+      elif (len(s) > 10):
+          ext = ExtendedSeed.from_string(0, s, (len(s.split(" ")) > 10))
+          realseeds.append(ext.get_seed())
+  return (realseeds, failseeds)
   
 def seeds_to_file(seedfile, seeds):
   with open(seedfile, "w") as f:
@@ -242,10 +245,10 @@ def compare_matches(gt_matches, sq_matches, total, thresh=0.8):
                                         (float(matchcount)/total)*100))
 
 class ExtendedSeed:
-  forward_seeds = []
-  reverse_seeds = []
+  gt_seeds = []
+  sq_seeds = []
   
-  def __init__(self, sl, s, spos, strand, ql, q, qpos, score, edist, ident):
+  def __init__(self, src, sl, s, spos, strand, ql, q, qpos, score, edist, ident, seed = None):
     #check spos <= slen && qpos <= qlen ?
     self.slen = int(sl)
     self.s = int(s)
@@ -258,24 +261,47 @@ class ExtendedSeed:
     self.score = int(score)
     self.edist = int(edist)
     self.ident = float(ident)
-    if strand == "P":
-      self.rev = True
-      ExtendedSeed.reverse_seeds.append(self)
+    self.rev = (strand == "P")
+    self.seed = seed
+    
+    if src == 0:
+      ExtendedSeed.gt_seeds.append(self)
+    elif src == 1:
+      ExtendedSeed.sq_seeds.append(self)
     else:
-      self.rev = False
-      ExtendedSeed.forward_seeds.append(self)
+      raise(ValueError)
     
   @classmethod
-  def from_string(cls, line):
-    sl, s, spos, strand, ql, q, qpos, score, edist, ident = line.split(" ")[:10]
-    return cls(sl, s, spos, strand, ql, q, qpos, score, edist, ident)
-    
-  def get_forward_seeds():
-    return forward_seeds
-    
-  def get_reverse_seeds():
-    return reverse_seeds
-    
+  def from_string(cls, src, line, withseed=False):
+    line = line.split(" ")
+    if withseed:
+      seed = Seed.from_extended(False, line)
+    else:
+      seed = None
+    sl, s, spos, strand, ql, q, qpos, score, edist, ident = line[:10]
+    return cls(src, sl, s, spos, strand, ql, q, qpos, score, edist, ident, seed)
+  
+  @staticmethod
+  def get_gt_seeds():
+    return ExtendedSeed.gt_seeds
+
+  @staticmethod
+  def get_sq_seeds():
+    return ExtendedSeed.sq_seeds
+  
+  @staticmethod
+  def get_seeds():
+    return ExtendedSeed.gt_seeds + ExtendedSeed.sq_seeds
+
+  def has_seed(self):
+    return (self.seed != None)
+
+  def get_seed(self):
+    return self.seed
+
+  def set_seed(self, seed):
+    self.seed = seed
+
   def equivalent(self, other, skip=[]):
     if (self.slen == other.slen and 
         self.s == other.s and
@@ -321,25 +347,37 @@ class ExtendedSeed:
              float(qolap)/self.qlen + 
              float(qolap)/other.qlen) / 4)
 
-  def to_line(self):
-    return "%s %s %s %s %s %s %s %s %s %s" %(self.slen, self.s, self.spos,
+  def to_line(self, withseed = False):
+    out = "%s %s %s %s %s %s %s %s %s %s" %(self.slen, self.s, self.spos,
                                              "P" if self.rev else "F", 
                                              self.qlen, self.q, self.qpos, 
                                              self.score, self.edist,
                                              self.ident)
+    if withseed and self.seed != None:
+      out += " %s %s %s" %(self.seed.l, self.seed.spos, self.seed.qpos)
+
+    return out
 
 class Seed:
   def __init__(self, fail, strand, s, spos, q, qpos, l):
     self.fail = fail
-    self.s = s
-    self.spos = spos
-    self.q = q
-    self.qpos = qpos
-    self.l = l
+    self.s = int(s)
+    self.spos = int(spos)
+    self.q = int(q)
+    self.qpos = int(qpos)
+    self.l = int(l)
     self.rev = (strand == "P")
+    
+  @classmethod
+  def from_extended(cls, fail, line):
+    assert(len(line) > 10)
+    return cls(fail, line[3], line[1], line[11], line[5], line[12], line[10])
     
   def is_failed(self):
     return self.fail
+    
+  def is_self_seed(self):
+    return (self.s == self.q and self.rev == False)
 
   def to_line(self):
     return "%s,%s,%s,%s,%s,%s,%s\n" %("-" if self.fail else "+",
@@ -354,29 +392,44 @@ def main():
   
   encode(params["infile"])
   seeds = do_gt_extend(params)
-  succ, fail, gt_extend = parse_seeds(seeds)
+  succ, fail = parse_seeds(seeds)
   
-  if len(succ) == 0:
-    print("no seeds were successfully extended")
+  gt_extend = []
+  for s in ExtendedSeed.get_gt_seeds():
+    if s.has_seed():
+      seed = s.get_seed()
+      if seed.is_self_seed():
+        continue #skip self seeds
+    gt_extend.append(s)
+    
+  if len(gt_extend) == 0:
+    print("no (non-self) seeds were successfully extended")
     return 1
   
-  seeds_to_file(params["seedfile"], succ)
+  #succ contains seeds which were extended
+  #gt_extend contains filtered ExtendedSeeds
+  to_write = [seed.get_seed() for seed in gt_extend if seed.get_seed() != None]
+  seeds_to_file(params["seedfile"], to_write)
   if params["qfile"]:
     sq_out = run_with_seqan(params["seqan"], params["seedfile"], 
                             params["infile"], params["qfile"])
   else:
     sq_out = run_with_seqan(params["seqan"], params["seedfile"], params["infile"])
 
-  sq_extend = []
-  for s in sq_out:
-    sq_extend.append(ExtendedSeed.from_string(s))
+  for n, s in enumerate(sq_out):
+    extseed = ExtendedSeed.from_string(1, s)
+    extseed.set_seed(to_write[n])
+  sq_extend = ExtendedSeed.get_sq_seeds()
+  assert(len(gt_extend) == len(sq_extend))
   
   if params["compare"]:
     print("got %s seeds from gt (%s success, %s fail)" %(len(succ + fail), len(succ), len(fail)))
     compare_matches(gt_extend, sq_extend, len(succ))
 
   fields = "# Fields: s.len, s.seqnum, s.start, strand, q.len, q.seqnum, "\
-             "q.start, score, editdist, identity" #, seedlen, s.seedstart, q.seedstart\n"
+             "q.start, score, editdist, identity"
+  if params["printseeds"]:
+    fields += ", seedlen, s.seedstart, q.seedstart"
   
   if params["outfile"]:
     for suff in ["_gt", "_sq"]:
@@ -384,16 +437,20 @@ def main():
         f.write(fields + "\n")
         extend = sq_extend if suff == "_sq" else gt_extend
         for s in extend:
-          f.write(s.to_line() + "\n")
+          f.write(s.to_line(params["printseeds"]) + "\n")
   elif not params["compare"]:
-    for i in range(2):
+    for n, arr in enumerate([sq_extend, gt_extend]):
+      if verbose:
+        if n == 0:
+          print("seqan script extension results:")
+        if n == 1:
+          print("gt seed_extend results:")
       print(fields)
-      extend = sq_extend if i == 1 else gt_extend
-      for s in extend:
-        print(s.to_line())
-      if i == 0:
+      for s in arr:
+        print(s.to_line(params["printseeds"]))
+      if n == 0:
         print("\n\n")
-  #2nd fields entry before reverse seeds isnt printed here
+  #2nd fields entry before reverse seeds isnt printed
 
   return 0
   
