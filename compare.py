@@ -386,14 +386,24 @@ class Seed:
                                       self.qpos, self.l)
 
 
-def main():  
+def main():
+  if verbose: print("parsing opts")
   opts = parse_opts()
   params = check_opts(opts)
   
+  if verbose: print("encoding %s" %params["infile"])
   encode(params["infile"])
+  if params["qfile"] != None:
+    if verbose: print("encoding %s" %params["qfile"])
+    encode(params["qfile"])
+  
+  if verbose: print("doing gt_seed extension")
   seeds = do_gt_extend(params)
+  
+  if verbose: print("parsing gt seeds")
   succ, fail = parse_seeds(seeds)
   
+  if verbose: print("filtering seeds")
   gt_extend = []
   for s in ExtendedSeed.get_gt_seeds():
     if s.has_seed():
@@ -408,8 +418,11 @@ def main():
   
   #succ contains seeds which were extended
   #gt_extend contains filtered ExtendedSeeds
+  if verbose: print("writing seeds to %s" %params["seedfile"])
   to_write = [seed.get_seed() for seed in gt_extend if seed.get_seed() != None]
   seeds_to_file(params["seedfile"], to_write)
+  
+  if verbose: print("doing seqan seed extension")
   if params["qfile"]:
     sq_out = run_with_seqan(params["seqan"], params["seedfile"], 
                             params["infile"], params["qfile"])
@@ -431,6 +444,7 @@ def main():
   if params["printseeds"]:
     fields += ", seedlen, s.seedstart, q.seedstart"
   
+  if verbose: print("output:")
   if params["outfile"]:
     for suff in ["_gt", "_sq"]:
       with open(params["outfile"] + suff, "w") as f:
