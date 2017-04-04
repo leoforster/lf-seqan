@@ -1,5 +1,6 @@
 #include <fstream>
 #include <iostream>
+#include <time.h>
 
 #include <seqan/align.h>
 #include <seqan/align_extend.h>
@@ -17,7 +18,9 @@ using namespace seqan;
 
 int main(int argc, char const ** argv)
 {
-  int i = 0, j = 0;
+  int i = 0, j = 0, seedcount = 0;
+  struct timespec start, finish;
+  double elapsed;
   StringSet<CharString> ids;
   StringSet<CharString> seqs, quer; //DnaString ?
   Score<int> scoring(2, -1, -2);
@@ -69,8 +72,12 @@ int main(int argc, char const ** argv)
   //parse and extend seeds
   std::ifstream infile(seedFile);
   std::string fail, strand, sid, qid, spos, qpos, len;
+  
+  clock_gettime(CLOCK_MONOTONIC, &start);
+  
   while (infile.good()) //last newline gives repeated alignment
   {
+    seedcount++;
     std::getline(infile, fail, ',');
     std::getline(infile, strand, ',');
     std::getline(infile, sid, ',');     
@@ -147,6 +154,13 @@ int main(int argc, char const ** argv)
               << qpos << "\n";
     //std::cout << align << std::endl;
   }
+  
+  clock_gettime(CLOCK_MONOTONIC, &finish);
+  
+  elapsed = (finish.tv_sec - start.tv_sec);
+  elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
+  std::cout << "# ... xdrop extension of " << seedcount << " seeds in " 
+            << elapsed << " seconds." << std::endl;
 
   return 0;
 }

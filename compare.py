@@ -4,6 +4,11 @@ import sys
 import os
 import subprocess
 import argparse
+try:
+  from timeit import timeit
+  can_time = True
+except:
+  can_time = False
 
 verbose = False
 
@@ -11,6 +16,7 @@ verbose = False
 #todo: -maxmat and -l -> maximal matches of minimum length l
 #todo: chaining
 #todo: input an encoded file
+#todo: -relax-polish, -overlappingseeds, -benchmark, -only-seeds
 
 #todo: option to compare successful seeds, failed seeds, or both
 def parse_opts():
@@ -68,7 +74,8 @@ def check_opts(args):
     "xcutoff":None, 
     "compare":False,
     "seedfile":None,
-    "printseeds":False
+    "printseeds":False,
+    "failedseeds":False
     }
 
   #seqan
@@ -116,14 +123,15 @@ def check_opts(args):
   else:
     params["seedfile"] = "seeds.txt"
 
-  if args.seedlen:
-    params["seedlen"] = args.seedlen
-  if args.parts:
-    params["parts"] = args.parts
   params["do_xdrop"] = False if args.noxdrop else True #default: do xdrop !
   params["do_greedy"] = True if args.greedy else False
   params["compare"] = True if args.compare else False
   params["printseeds"] = True if args.printseeds else False
+  params["failedseeds"] = True if args.failedseeds else False
+  if args.seedlen:
+    params["seedlen"] = args.seedlen
+  if args.parts:
+    params["parts"] = args.parts
   if args.xcut:
     params["xcutoff"] = args.xcut
   if args.minid:
@@ -169,15 +177,17 @@ def do_gt_extend(refidx, qidx, params):
   if params["mincov"]: pstr += " -mincoverage %s" %(params["mincov"])
   if params["minid"]: pstr += " -minidentity %s" %(params["minid"])
   
-  #with -outfmt: failed_seed alignment
-  call = "gt seed_extend -ii %s %s -outfmt seed.len seed.s.start seed.q.start -no-reverse" %(refidx, pstr)
+  outfmt = "seed.len seed.s.start seed.q.start"
+  if params["failedseeds"]:
+    outfmt += " failed_seed"
+  call = "gt seed_extend -ii %s %s -outfmt %s -no-reverse -v -relax-polish -overlappingseeds" %(refidx, pstr, outfmt)
   
   try:
     seeds = subprocess.check_output([call], shell=True, stderr=subprocess.STDOUT)
   except:
     print("failed to get seeds -- call was:\n " + call)
     sys.exit()
-  if verbose: print("call was:\n", call)
+  if verbose: print("call was:\n\t" + call)
   
   seeds = seeds.decode("utf-8").split("\n")
   return seeds
@@ -193,12 +203,14 @@ def run_with_seqan(seqan, seedfile, infile, qfile = None):
   except:
     print("failed to run seqan script -- call was:\n " + call)
     sys.exit()
-  if verbose: print("call was:\n", call)
+  if verbose: print("call was:\n\t" + call)
   
-  extend = extend.decode("utf-8").split("\n")[:-2] #slice due to irregularities
-  return extend
+  extend = extend.decode("utf-8").split("\n")
+  time = float(extend[-2].split(" ")[-2])
+  del extend[-3:] #final seed is empty, before is time, before is duplicate seed
+  return (extend, time)
   
-def encode(indexname,infile):
+def encode(indexname, infile):
   #encseq encode places encoded files in script calling directory -- change it?
   try:
     subprocess.call(["gt encseq encode -indexname %s %s" %(indexname, infile)],
@@ -215,18 +227,21 @@ def parse_seeds(seeds):
   realseeds = []
   failseeds = []
   optionline = None
+  runtime = None
   for s in seeds:
     if s != "":
       if s.startswith("#"):
         if s.startswith("# failed_seed"):
           s = s.split("\t")
           failseeds.append(Seed(True, s[4], s[2], s[3], s[5], s[6], s[1]))
-        if s.startswith("# Options:"):
+        elif s.startswith("# Options:"):
           optionline = s
+        elif s.startswith("# ... xdrop") or s.startswith("# ... greedy"):
+          runtime = float(s.split(" ")[-2])
       elif (len(s) > 10):
           ext = ExtendedSeed.from_string(0, s, (len(s.split(" ")) > 10))
           realseeds.append(ext.get_seed())
-  return (realseeds, failseeds, optionline)
+  return (realseeds, failseeds, optionline, runtime)
   
 def seeds_to_file(seedfile, seeds):
   with open(seedfile, "w") as f:
@@ -408,16 +423,16 @@ def main():
   qidx = "qidx"
   
   if verbose: print("encoding %s" %params["infile"])
-  encode(refidx,params["infile"])
+  encode(refidx, params["infile"])
   if params["qfile"] != None:
     if verbose: print("encoding %s" %params["qfile"])
-    encode(qidx,params["qfile"])
+    encode(qidx, params["qfile"])
   
   if verbose: print("doing gt_seed extension")
   seeds = do_gt_extend(refidx, qidx, params)
-  
+
   if verbose: print("parsing gt seeds")
-  succ, fail, optionline = parse_seeds(seeds)
+  succ, fail, optline, gt_time = parse_seeds(seeds)
   
   if verbose: print("filtering seeds")
   gt_extend = []
@@ -425,7 +440,8 @@ def main():
     if s.has_seed():
       seed = s.get_seed()
       if seed.is_self_seed():
-        continue #skip self seeds
+        continue
+        #todo: filter failed seeds based on self-seeds
     gt_extend.append(s)
     
   if len(gt_extend) == 0:
@@ -436,6 +452,8 @@ def main():
   #gt_extend contains filtered ExtendedSeeds
   if verbose: print("writing seeds to %s" %params["seedfile"])
   to_write = [ext.get_seed() for ext in gt_extend if ext.has_seed()]
+  if params["failedseeds"]:
+    to_write += fail
   seeds_to_file(params["seedfile"], to_write)
   
   if verbose: print("doing seqan seed extension")
@@ -443,13 +461,13 @@ def main():
     sq_out = run_with_seqan(params["seqan"], params["seedfile"], 
                             params["infile"], params["qfile"])
   else:
-    sq_out = run_with_seqan(params["seqan"], params["seedfile"], params["infile"])
+    sq_out, sq_time = run_with_seqan(params["seqan"], params["seedfile"], params["infile"])
 
   for n, s in enumerate(sq_out):
     extseed = ExtendedSeed.from_string(1, s)
     extseed.set_seed(to_write[n])
   sq_extend = ExtendedSeed.get_sq_seeds()
-  assert(len(gt_extend) == len(sq_extend))
+  if not params["failedseeds"]: assert(len(gt_extend) == len(sq_extend))
   
   if params["compare"]:
     print("got %s seeds from gt (%s success, %s fail)" %(len(succ + fail), len(succ), len(fail)))
@@ -464,7 +482,7 @@ def main():
   if params["outfile"]:
     for suff in ["_gt", "_sq"]:
       with open(params["outfile"] + suff, "w") as f:
-        f.write(optionline + "\n")
+        f.write(optline + "\n")
         f.write(fields + "\n")
         extend = sq_extend if suff == "_sq" else gt_extend
         for s in extend:
@@ -482,7 +500,8 @@ def main():
       if n == 0:
         print("\n\n")
   #2nd fields entry before reverse seeds isnt printed
-
+  if can_time: print("runtimes:\n\tgt: %s\n\tsq: %s" %(gt_time, sq_time))
+  
   return 0
 
 if __name__ == '__main__':
