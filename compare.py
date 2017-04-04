@@ -4,11 +4,6 @@ import sys
 import os
 import subprocess
 import argparse
-try:
-  from timeit import timeit
-  can_time = True
-except:
-  can_time = False
 
 verbose = False
 
@@ -180,7 +175,7 @@ def do_gt_extend(refidx, qidx, params):
   outfmt = "seed.len seed.s.start seed.q.start"
   if params["failedseeds"]:
     outfmt += " failed_seed"
-  call = "gt seed_extend -ii %s %s -outfmt %s -no-reverse -v -relax-polish -overlappingseeds" %(refidx, pstr, outfmt)
+  call = "gt seed_extend -ii %s %s -outfmt %s -no-reverse -v" %(refidx, pstr, outfmt)
   
   try:
     seeds = subprocess.check_output([call], shell=True, stderr=subprocess.STDOUT)
@@ -247,7 +242,7 @@ def seeds_to_file(seedfile, seeds):
   with open(seedfile, "w") as f:
     for s in seeds:
       #assert(type(s) == Seed)
-      f.write(s.to_line())
+      f.write(s.formatted())
 
 def compare_matches(gt_matches, sq_matches, total, thresh=0.8):
   assert(total > 0)
@@ -407,8 +402,16 @@ class Seed:
     
   def is_self_seed(self):
     return (self.s == self.q and self.rev == False)
-
+  
   def to_line(self):
+    pref = ""
+    if self.fail:
+      pref += "# failed_seed: "
+    return  pref + "%s %s %s %s %s %s" %(self.l, self.s, self.spos,
+                                         "P" if self.rev else "F",
+                                         self.q, self.qpos)
+
+  def formatted(self):
     return "%s,%s,%s,%s,%s,%s,%s\n" %("-" if self.fail else "+",
                                       "P" if self.rev else "F",
                                       self.s, self.spos, self.q, 
@@ -470,7 +473,6 @@ def main():
   if not params["failedseeds"]: assert(len(gt_extend) == len(sq_extend))
   
   if params["compare"]:
-    print("got %s seeds from gt (%s success, %s fail)" %(len(succ + fail), len(succ), len(fail)))
     compare_matches(gt_extend, sq_extend, len(succ))
 
   fields = "# Fields: s.len, s.seqnum, s.start, strand, q.len, q.seqnum, "\
@@ -487,20 +489,32 @@ def main():
         extend = sq_extend if suff == "_sq" else gt_extend
         for s in extend:
           f.write(s.to_line(params["printseeds"]) + "\n")
+        #write failed seeds?
+        if params["failedseeds"] and suff == "_gt":
+          for s in fail:
+            f.write(s.to_line() + "\n")
+        #write runtimes
+        runtime = sq_time if suff == "_sq" else gt_time
+        method = "greedy" if params["do_greedy"] else "xdrop"
+        f.write("# ... %s extension of %.4f seeds in %s seconds." %(method, len(extend), runtime))
   elif not params["compare"]:
-    for n, arr in enumerate([sq_extend, gt_extend]):
+    for n, arr in enumerate([gt_extend, sq_extend]):
       if verbose:
         if n == 0:
-          print("seqan script extension results:")
-        if n == 1:
           print("gt seed_extend results:")
+        if n == 1:
+          print("seqan script extension results:")
       print(fields)
       for s in arr:
         print(s.to_line(params["printseeds"]))
       if n == 0:
         print("\n\n")
   #2nd fields entry before reverse seeds isnt printed
-  if can_time: print("runtimes:\n\tgt: %s\n\tsq: %s" %(gt_time, sq_time))
+  
+  if verbose: 
+    print("got %s seeds from gt (%s success, %s fail)" %(len(succ + fail), len(succ), len(fail)))
+    print("got %s seeds from sq" %len(sq_out))
+    print("runtimes:\n\tgt: %s\n\tsq: %s" %(gt_time, sq_time))
   
   return 0
 
