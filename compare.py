@@ -29,6 +29,10 @@ def parse_opts():
   parser.add_argument(
     "-l", "--seedlen", help="seedlength", type=int)
   parser.add_argument(
+    "-a", "--parts", help="parts", type=int)
+  parser.add_argument(
+    "-f", "--failedseeds", help="include gt failed seeds in sq seed extension", action="store_true")
+  parser.add_argument(
     "-p", "--seedfile", help="path of file to write seed information", type=str)
   parser.add_argument(
     "-n", "--mincov", help="minimum coverage for seed_extend", type=int)
@@ -56,6 +60,7 @@ def check_opts(args):
     "qfile":None,
     "outfile":None,
     "seedlen":None,
+    "parts":None,
     "mincov":None,
     "minid":None,
     "do_xdrop":True, #default!
@@ -111,7 +116,10 @@ def check_opts(args):
   else:
     params["seedfile"] = "seeds.txt"
 
-  params["seedlen"] = args.seedlen if args.seedlen else 8
+  if args.seedlen:
+    params["seedlen"] = args.seedlen
+  if args.parts:
+    params["parts"] = args.parts
   params["do_xdrop"] = False if args.noxdrop else True #default: do xdrop !
   params["do_greedy"] = True if args.greedy else False
   params["compare"] = True if args.compare else False
@@ -150,18 +158,19 @@ def sequences_from_fasta(infile):
         seqs[idx] += n.strip("\n")
   return seqs
 
-def do_gt_extend(params):
+def do_gt_extend(refidx, qidx, params):
   pstr = ""
   if params["do_xdrop"]: pstr += " -extendxdrop" 
   if params["do_greedy"]: pstr += " -extendgreedy" 
-  if params["qfile"] != None: pstr += " -qii %s" %(params["qfile"]) 
+  if params["qfile"] != None: pstr += " -qii %s" %(qidx)
   if params["seedlen"]: pstr += " -seedlength %s" %(params["seedlen"])
+  if params["parts"]: pstr += " -parts %s" %(params["parts"])
   if params["xcutoff"]: pstr += " -xdropbelow %s" %(params["xcutoff"])
   if params["mincov"]: pstr += " -mincoverage %s" %(params["mincov"])
   if params["minid"]: pstr += " -minidentity %s" %(params["minid"])
   
   #with -outfmt: failed_seed alignment
-  call = "gt seed_extend -ii %s %s -outfmt seed" %(params["infile"], pstr)
+  call = "gt seed_extend -ii %s %s -outfmt seed.len seed.s.start seed.q.start -no-reverse" %(refidx, pstr)
   
   try:
     seeds = subprocess.check_output([call], shell=True, stderr=subprocess.STDOUT)
@@ -189,10 +198,11 @@ def run_with_seqan(seqan, seedfile, infile, qfile = None):
   extend = extend.decode("utf-8").split("\n")[:-2] #slice due to irregularities
   return extend
   
-def encode(infile):
+def encode(indexname,infile):
   #encseq encode places encoded files in script calling directory -- change it?
   try:
-    subprocess.call(["gt encseq encode %s" %infile], shell=True, stderr=subprocess.STDOUT)
+    subprocess.call(["gt encseq encode -indexname %s %s" %(indexname, infile)],
+                     shell=True, stderr=subprocess.STDOUT)
   except:
     print("failed to encode %s" %infile)
     sys.exit()
@@ -204,16 +214,19 @@ def decode(infile):
 def parse_seeds(seeds):
   realseeds = []
   failseeds = []
+  optionline = None
   for s in seeds:
     if s != "":
       if s.startswith("#"):
         if s.startswith("# failed_seed"):
           s = s.split("\t")
           failseeds.append(Seed(True, s[4], s[2], s[3], s[5], s[6], s[1]))
+        if s.startswith("# Options:"):
+          optionline = s
       elif (len(s) > 10):
           ext = ExtendedSeed.from_string(0, s, (len(s.split(" ")) > 10))
           realseeds.append(ext.get_seed())
-  return (realseeds, failseeds)
+  return (realseeds, failseeds, optionline)
   
 def seeds_to_file(seedfile, seeds):
   with open(seedfile, "w") as f:
@@ -264,6 +277,7 @@ class ExtendedSeed:
     self.rev = (strand == "P")
     self.seed = seed
     
+    #gt or sq seed?
     if src == 0:
       ExtendedSeed.gt_seeds.append(self)
     elif src == 1:
@@ -390,18 +404,20 @@ def main():
   if verbose: print("parsing opts")
   opts = parse_opts()
   params = check_opts(opts)
+  refidx = "refidx"
+  qidx = "qidx"
   
   if verbose: print("encoding %s" %params["infile"])
-  encode(params["infile"])
+  encode(refidx,params["infile"])
   if params["qfile"] != None:
     if verbose: print("encoding %s" %params["qfile"])
-    encode(params["qfile"])
+    encode(qidx,params["qfile"])
   
   if verbose: print("doing gt_seed extension")
-  seeds = do_gt_extend(params)
+  seeds = do_gt_extend(refidx, qidx, params)
   
   if verbose: print("parsing gt seeds")
-  succ, fail = parse_seeds(seeds)
+  succ, fail, optionline = parse_seeds(seeds)
   
   if verbose: print("filtering seeds")
   gt_extend = []
@@ -419,7 +435,7 @@ def main():
   #succ contains seeds which were extended
   #gt_extend contains filtered ExtendedSeeds
   if verbose: print("writing seeds to %s" %params["seedfile"])
-  to_write = [seed.get_seed() for seed in gt_extend if seed.get_seed() != None]
+  to_write = [ext.get_seed() for ext in gt_extend if ext.has_seed()]
   seeds_to_file(params["seedfile"], to_write)
   
   if verbose: print("doing seqan seed extension")
@@ -440,14 +456,15 @@ def main():
     compare_matches(gt_extend, sq_extend, len(succ))
 
   fields = "# Fields: s.len, s.seqnum, s.start, strand, q.len, q.seqnum, "\
-             "q.start, score, editdist, identity"
+           "q.start, score, editdist, identity"
   if params["printseeds"]:
-    fields += ", seedlen, s.seedstart, q.seedstart"
+    fields += ", seed.len, seed.s.start, seed.q.start"
   
   if verbose and not params["outfile"]: print("output:")
   if params["outfile"]:
     for suff in ["_gt", "_sq"]:
       with open(params["outfile"] + suff, "w") as f:
+        f.write(optionline + "\n")
         f.write(fields + "\n")
         extend = sq_extend if suff == "_sq" else gt_extend
         for s in extend:
@@ -467,22 +484,6 @@ def main():
   #2nd fields entry before reverse seeds isnt printed
 
   return 0
-  
-  
 
 if __name__ == '__main__':
     main()
-
-
-
-
-
-
-
-
-
-
-
-
-
-

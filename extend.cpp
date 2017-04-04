@@ -124,8 +124,8 @@ int main(int argc, char const ** argv)
     //int new_qpos = beginPosition(q) + (endPosition(q) - clippedBeginPosition(row(align, 1)));
     int new_qpos = clippedBeginPosition(row(align, 1));
     int score = stats.alignmentScore;
-    int edist = stats.numMatches; //stats.numNegativeScores?
-    int ident = stats.alignmentIdentity; //float vs int? decimal places?
+    int edist = stats.numMismatches + stats.numInsertions + stats.numDeletions;
+    float ident = stats.alignmentIdentity; //float vs int? decimal places?
 
     //std::cout << "# Fields: s.len, s.seqnum, s.start, strand, q.len, q.seqnum, "
                   //" q.start, score, editdist, identity, seedlen, s.seedstart, "
@@ -140,6 +140,7 @@ int main(int argc, char const ** argv)
               << new_qpos << " "
               << score << " "
               << edist << " "
+              << std::setprecision(4)
               << ident << " "
               << len << " "
               << spos << " "
