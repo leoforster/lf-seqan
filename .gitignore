@@ -34,3 +34,11 @@ xdrop/gt/gt_tests/
 *.exe
 *.out
 *.app
+
+#gt encseq
+*.md5
+*.des
+*.esq
+*.ssp
+*.sds
+*.kmer
