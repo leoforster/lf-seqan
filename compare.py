@@ -50,6 +50,8 @@ def parse_opts():
   parser.add_argument(
     "--compare", help="use internal match comparison", action="store_true")
   parser.add_argument(
+    "--extendseed", help="use seqan extendSeed instead of extendAlignment", action="store_true")
+  parser.add_argument(
     "-v", "--verbose", help="generate additional output (verbose mode)", action="store_true")
   args = parser.parse_args()
   return args
@@ -70,7 +72,8 @@ def check_opts(args):
     "compare":False,
     "seedfile":None,
     "printseeds":False,
-    "failedseeds":False
+    "failedseeds":False,
+    "extendseed":False
     }
 
   #seqan
@@ -123,6 +126,7 @@ def check_opts(args):
   params["compare"] = True if args.compare else False
   params["printseeds"] = True if args.printseeds else False
   params["failedseeds"] = True if args.failedseeds else False
+  params["extendseed"] = True if args.extendseed else False
   if args.seedlen:
     params["seedlen"] = args.seedlen
   if args.parts:
@@ -187,11 +191,11 @@ def do_gt_extend(refidx, qidx, params):
   seeds = seeds.decode("utf-8").split("\n")
   return seeds
   
-def run_with_seqan(seqan, seedfile, infile, qfile = None):
+def run_with_seqan(seqan, seedfile, infile, method, qfile = None):
   if qfile:
-    call = "%s 2 %s %s %s" %(seqan, seedfile, infile, qfile)
+    call = "%s 2 %s %s %s %s" %(seqan, method, seedfile, infile, qfile)
   else:
-    call = "%s 1 %s %s" %(seqan, seedfile, infile)
+    call = "%s 1 %s %s %s" %(seqan, method, seedfile, infile)
   
   try:
     extend = subprocess.check_output([call], shell=True, stderr=subprocess.STDOUT)
@@ -460,11 +464,13 @@ def main():
   seeds_to_file(params["seedfile"], to_write)
   
   if verbose: print("doing seqan seed extension")
+  method = 1 if params["extendseed"] else 0
   if params["qfile"]:
-    sq_out = run_with_seqan(params["seqan"], params["seedfile"], 
-                            params["infile"], params["qfile"])
+    sq_out, sq_time = run_with_seqan(params["seqan"], params["seedfile"], 
+                                     params["infile"], method, params["qfile"])
   else:
-    sq_out, sq_time = run_with_seqan(params["seqan"], params["seedfile"], params["infile"])
+    sq_out, sq_time = run_with_seqan(params["seqan"], params["seedfile"], 
+                                     params["infile"], method)
 
   for n, s in enumerate(sq_out):
     extseed = ExtendedSeed.from_string(1, s)
@@ -496,7 +502,7 @@ def main():
         #write runtimes
         runtime = sq_time if suff == "_sq" else gt_time
         method = "greedy" if params["do_greedy"] else "xdrop"
-        f.write("# ... %s extension of %.4f seeds in %s seconds." %(method, len(extend), runtime))
+        f.write("# ... %s extension of %s seeds in %.4f seconds." %(method, len(extend), runtime))
   elif not params["compare"]:
     for n, arr in enumerate([gt_extend, sq_extend]):
       if verbose:
@@ -520,3 +526,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

@@ -14,7 +14,87 @@ using namespace seqan;
 //http://docs.seqan.de/seqan/2.0.0/demos/seeds/seeds_chaining.cpp
 //http://seqan.readthedocs.io/en/master/Tutorial/Algorithms/SeedExtension.html
 //Merge() ? see http://docs.seqan.de/seqan/2.1.0/class_SeedSet.html
-//handling failed seeds?
+
+//todo: lengths of extended seeds in each sequence are identical
+//how to count gaps to get correct length?
+
+void alignment_based_extension(int sid, int qid, std::string strand, int len, 
+                               String<char> s, String<char> q, Score<int> scoring,
+                               unsigned sstart, unsigned send, 
+                               unsigned qstart, unsigned qend)
+{
+  Align<Infix<CharString const>::Type> align;
+  AlignmentStats stats;
+  resize(rows(align), 2);
+  
+  assignSource(row(align, 0), infix(s, sstart, send));
+  assignSource(row(align, 1), infix(q, qstart, qend));
+  Tuple<unsigned, 4> positions = { {sstart, qstart, send, qend} };
+  extendAlignment(align, s, q, positions, EXTEND_BOTH, 2, scoring);
+  
+  //globalAlignment(align, scoring);
+  computeAlignmentStats(stats, align, scoring);
+
+  int new_slen = clippedEndPosition(row(align, 0)) - 
+                 clippedBeginPosition(row(align, 0));
+  int new_qlen = clippedEndPosition(row(align, 1)) - 
+                 clippedBeginPosition(row(align, 1));
+  int new_spos = clippedBeginPosition(row(align, 0));
+  //int new_qpos = beginPosition(q) + 
+                 //(endPosition(q) - clippedBeginPosition(row(align, 1)));
+  int new_qpos = clippedBeginPosition(row(align, 1));
+  int score = stats.alignmentScore;
+  int edist = stats.numMismatches + stats.numInsertions + stats.numDeletions;
+  float ident = stats.alignmentIdentity;
+
+  std::cout << new_slen << " "
+            << sid << " "
+            << new_spos << " "
+            << strand << " "
+            << new_qlen << " "
+            << qid << " "
+            << new_qpos << " "
+            << score << " "
+            << edist << " "
+            << std::setprecision(4)
+            << ident << " "
+            << len << " "
+            << sstart << " "
+            << qstart << "\n";
+  //std::cout << align << std::endl;
+}
+
+void seed_based_extension(int sid, int qid, std::string strand, int len, 
+                         String<char> s, String<char> q, Score<int> scoring,
+                         unsigned sstart, unsigned send, 
+                         unsigned qstart, unsigned qend)
+{
+  Seed<Simple> seed(sstart, qstart, len);
+  extendSeed(seed, s, q, EXTEND_BOTH, scoring, 2, GappedXDrop());
+  
+  int new_slen = endPositionH(seed) - beginPositionH(seed);
+  int new_spos = beginPositionH(seed);
+  int new_qlen = endPositionV(seed) - beginPositionV(seed);
+  int new_qpos = beginPositionV(seed);
+  int score = 0;
+  int edist = 0;
+  float ident = 0.0;
+  
+  std::cout << new_slen << " "
+            << sid << " "
+            << new_spos << " "
+            << strand << " "
+            << new_qlen << " "
+            << qid << " "
+            << new_qpos << " "
+            << score << " "
+            << edist << " "
+            << std::setprecision(4)
+            << ident << " "
+            << len << " "
+            << sstart << " "
+            << qstart << "\n";
+}
 
 int main(int argc, char const ** argv)
 {
@@ -26,6 +106,7 @@ int main(int argc, char const ** argv)
   
   //assert(argc >= 4);
   int filecount = atoi(argv[1]);
+  int method = atoi(argv[2]);
   if (filecount == 0) 
   {
     std::cerr << "couldn't convert \"" << argv[1] << "\"\n";
@@ -33,11 +114,11 @@ int main(int argc, char const ** argv)
   }
   else 
   {
-    filecount == 1 ? j = 3 : j = 4;
+    filecount == 1 ? j = 4 : j = 5;
   }
 
   //check files exist
-  for (i = 2; i < j; i++)
+  for (i = 3; i < j; i++)
   {
     if (FILE *file = std::fopen(argv[i], "r")) 
     {
@@ -49,11 +130,11 @@ int main(int argc, char const ** argv)
     }
   }
   
-  const char* seedFile = argv[2];
-  const char* seqFile = argv[3];
+  const char* seedFile = argv[3];
+  const char* seqFile = argv[4];
   const char* qerFile = NULL;
   if (filecount == 2)
-    qerFile = argv[4];
+    qerFile = argv[5];
 
   //parse sequences
   SeqFileIn seqFileIn(seqFile);
@@ -63,10 +144,6 @@ int main(int argc, char const ** argv)
     SeqFileIn seqFileIn(qerFile);
     readRecords(ids, quer, seqFileIn);
   }
-  
-  //typedef Iterator<StringSet<CharString>, Standard>::Type TIterator;
-  //for (TIterator it = begin(quer, Standard()); it != end(quer, Standard()); ++it)
-    //std::cout << position(it, seqs) << " " << *it << std::endl;
   
   //parse and extend seeds
   std::ifstream infile(seedFile);
@@ -85,10 +162,6 @@ int main(int argc, char const ** argv)
     std::getline(infile, qpos, ',');
     std::getline(infile, len);
     
-    //Seed<Simple> seed(stoi(spos), stoi(qpos), stoi(len)); 
-    //extendSeed(seed, s, q, EXTEND_BOTH, MatchExtend());
-    //extendSeed(seed, s, q, EXTEND_BOTH, scoring, 2, GappedXDrop());
-    //extendSeed(seed, s, q, EXTEND_BOTH, scoring, 6, UnGappedXDrop());
     String<char> s, q;
     s = seqs[stoi(sid)];
     filecount == 1 ? q = seqs[stoi(qid)] : q = quer[stoi(qid)];
@@ -99,9 +172,9 @@ int main(int argc, char const ** argv)
     if (strand == "P")
       reverseComplement(q);
 
-    unsigned int sstart = stoi(spos);
-    unsigned int send = stoi(spos) + stoi(len);
-    unsigned int qstart, qend;
+    unsigned sstart = stoi(spos);
+    unsigned send = stoi(spos) + stoi(len);
+    unsigned qstart, qend;
     //if (strand == "P")
     //{
       //qstart = beginPosition(q) + (endPosition(q) - stoi(qpos));
@@ -112,46 +185,12 @@ int main(int argc, char const ** argv)
       qend = stoi(qpos) + stoi(len);
     //}
     
-    Align<Infix<CharString const>::Type> align;
-    AlignmentStats stats;
-    resize(rows(align), 2);
-    
-    assignSource(row(align, 0), infix(s, sstart, send));
-    assignSource(row(align, 1), infix(q, qstart, qend));
-    Tuple<unsigned, 4> positions = { {sstart, qstart, send, qend} };
-    extendAlignment(align, s, q, positions, EXTEND_BOTH, 2, scoring);
-    
-    //globalAlignment(align, scoring);
-    computeAlignmentStats(stats, align, scoring);
-
-    int new_slen = clippedEndPosition(row(align, 0)) - clippedBeginPosition(row(align, 0));
-    int new_qlen = clippedEndPosition(row(align, 1)) - clippedBeginPosition(row(align, 1));
-    int new_spos = clippedBeginPosition(row(align, 0));
-    //int new_qpos = beginPosition(q) + (endPosition(q) - clippedBeginPosition(row(align, 1)));
-    int new_qpos = clippedBeginPosition(row(align, 1));
-    int score = stats.alignmentScore;
-    int edist = stats.numMismatches + stats.numInsertions + stats.numDeletions;
-    float ident = stats.alignmentIdentity; //float vs int? decimal places?
-
-    //std::cout << "# Fields: s.len, s.seqnum, s.start, strand, q.len, q.seqnum, "
-                  //" q.start, score, editdist, identity, seedlen, s.seedstart, "
-                  //"q.seedstart" << std::endl;
-
-    std::cout << new_slen << " " //lengths are off due to gaps?
-              << sid << " "
-              << new_spos << " "
-              << strand << " "
-              << new_qlen << " "
-              << qid << " "
-              << new_qpos << " "
-              << score << " "
-              << edist << " "
-              << std::setprecision(4)
-              << ident << " "
-              << len << " "
-              << spos << " "
-              << qpos << "\n";
-    //std::cout << align << std::endl;
+    if (method == 0)
+      alignment_based_extension(stoi(sid), stoi(qid), strand, stoi(len), s, q, 
+                                scoring, sstart, send, qstart, qend);
+    else
+      seed_based_extension(stoi(sid), stoi(qid), strand, stoi(len), s, q, 
+                           scoring, sstart, send, qstart, qend);
   }
 
   std::cout << "# ... xdrop extension of " << seedcount << " seeds in " 
