@@ -69,7 +69,7 @@ def write_fasta(fasta, fname):
 def get_call(prog, target, query, out):
     call = ""
     if prog == "ssw":
-        call = "time {loc} -p -a {mat} {t} {q} > {o}".format(loc=progs[prog], mat=scoremat, 
+        call = "time {loc} -c -p -a {mat} {t} {q} > {o}".format(loc=progs[prog], mat=scoremat, 
                                                              t=target, q=query, o=out)
     elif prog == "ssearch36":
         call = "time {loc} -s {mat} {q} {t} > {o}".format(loc=progs[prog], mat=scoremat, 
@@ -80,7 +80,7 @@ def get_call(prog, target, query, out):
                                                                            t=target, 
                                                                            q=query, o=out)
     elif prog == "swalign":
-        call = "time {loc} -s {mat} -q {q} -d {t} > {o}".format(loc=progs[prog], mat=scoremat, 
+        call = "time {loc} -h -s {mat} -q {q} -d {t} > {o}".format(loc=progs[prog], mat=scoremat, 
                                                              t=target, q=query, o=out)
     elif prog == "seqan":
         call = "time {loc} {t} {q} > {o}".format(loc=progs[prog], t=target, q=query, o=out)

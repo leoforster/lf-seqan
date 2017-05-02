@@ -8,8 +8,6 @@ times = {}
 for i in files:
     times.setdefault(i, [])
 
-print(files)
-
 avg = []
 std = []
 normed = {}
@@ -32,7 +30,7 @@ for p in normed:
 ax1.set_title("normalized times for {x} measurements".format(x=len(times[list(times)[0]])))
 
 ticks = np.arange(len(list(times)))
-ax2.bar(ticks, avg, yerr=std)
+ax2.bar(ticks, avg, yerr=std, alpha=0.5, capsize=3, align="center")
 ax2.set_xticks(ticks)
 ax2.set_xticklabels(files)
 ax2.set_title("aligning " + sys.argv[-1])

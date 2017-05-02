@@ -13,7 +13,6 @@ verbose = False
 #todo: input an encoded file
 #todo: -relax-polish, -overlappingseeds, -benchmark, -only-seeds
 
-#todo: option to compare successful seeds, failed seeds, or both
 def parse_opts():
   parser = argparse.ArgumentParser(
     description="compare gt seed_extend seeds with those from the seqan library.")
