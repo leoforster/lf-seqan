@@ -20,7 +20,10 @@ for p in files:
     avg.append(np.average(times[p]))
     std.append(np.std(times[p]))
     
-    normed[p] = [(x - min(times[p])) / (max(times[p]) - min(times[p])) for x in times[p]]
+    if len(times[p]) == 1:
+        normed[p] = times[p]
+    else:
+        normed[p] = [(x - min(times[p])) / (max(times[p]) - min(times[p])) for x in times[p]]
 
 fig, (ax1, ax2) = plt.subplots(2)
 axis = np.arange(len(times[list(times)[0]]))
