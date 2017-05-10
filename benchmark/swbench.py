@@ -80,8 +80,10 @@ def get_call(prog, target, query, out):
         call = "time {loc} -c -p -a {mat} {t} {q} > {o}".format(loc=progs[prog], mat=scoremat, 
                                                              t=target, q=query, o=out)
     elif prog == "ssearch36":
-        call = "time {loc} -d 9999 -T 1 -s {mat} {q} {t} > {o}".format(loc=progs[prog], mat=scoremat, 
-                                                             t=target, q=query, o=out)
+        call = "time {loc} -d 9999 -T 1 -f '-11' -g '-1' -s {mat} {q} {t} > {o}".format(loc=progs[prog], 
+                                                                                        mat=scoremat, 
+                                                                                t=target, q=query, o=out)
+        #consider -E 9999
     elif prog == "swipe":
         call = "time {loc} -a 1 -b 9999 -M {mat} -G 11 -E 1 -i {q} -d {t} > {o}".format(loc=progs[prog], 
                                                                            mat=scoremat, 
@@ -103,9 +105,12 @@ def get_call(prog, target, query, out):
 
 def main():
     #clean old files
-    filelist = [ f for f in os.listdir(os.path.abspath("sup/")) if f != "placeholder" ]
-    for f in filelist:
+    filelist_sup = [ f for f in os.listdir(os.path.abspath("sup/")) if f != "placeholder" ]
+    filelist_out = [ f for f in os.listdir(os.path.abspath("out/")) if f != "placeholder" ]
+    for f in filelist_sup:
         os.remove(os.path.abspath("sup/{ff}".format(ff=f)))
+    for f in filelist_out:
+        os.remove(os.path.abspath("out/{ff}".format(ff=f)))
     
     opts = parse_opts()
 
