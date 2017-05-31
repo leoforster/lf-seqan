@@ -14,8 +14,9 @@ normed = {}
 for p in files:
     with open(p, "r") as f:
         for i in f.readlines():
-            if i.startswith("real"):
-                times[p].append(float(i.split("m")[1].strip("s\n")))
+            if i.startswith("user"):
+                t = 60 * float(i.split("m")[0].split("\t")[1]) + float(i.split("m")[1].strip("s\n"))
+                times[p].append(t)
                 
     avg.append(np.average(times[p]))
     std.append(np.std(times[p]))
