@@ -8,12 +8,20 @@ def reset(d):
     for i in d:
         d[i] = None
 
+def fasta_get_ids(path):
+    lab = []
+    with open(path, "r") as f:
+        for i in f.readlines():
+            if i.startswith(">"):
+                lab.append(i[1:].strip("\n"))
+    return lab
+
 def reformat_ssw(path):
     with open(floc + path, "r") as f:
         data = f.read()#.replace('\n', '')
-        
+
     data = data.split("target_name")
-    
+
     if outfmt == "seed":
         with open(floc + path + "_formatted", "w") as w:
             w.write("# Fields: s.len, s.seqnum, s.start, strand, "\
@@ -25,10 +33,10 @@ def reformat_ssw(path):
                 i = i.split("\n")
                 tq = i[0:2]
                 rest = i[2].split("\t")
-                                
+
                 fields["s.seqnum"] = int(tq[0][2:])
                 fields["q.seqnum"] = int(tq[1].split(":")[1])
-                
+
                 fields["score"] = int(rest[0].split(":")[1])
                 if rest[1].startswith("suboptimal"):
                     fields["strand"] = 'P' if rest[2].split(":")[1] == "-" else 'F'
@@ -42,7 +50,7 @@ def reformat_ssw(path):
                     fields["s.len"] = int(rest[3].split(":")[1]) - fields["s.start"] + 1
                     fields["q.start"] = int(rest[4].split(":")[1])
                     fields["q.len"] = int(rest[5].split(":")[1]) - fields["q.start"] + 1
-                
+
                 w.write("{sl}\t{ss}\t{st}\t{s}\t{ql}\t{qs}\t{qt}\t{c}\n".format(
                     sl = fields["s.len"],
                     ss = fields["s.seqnum"],
@@ -52,23 +60,74 @@ def reformat_ssw(path):
                     qs = fields["q.seqnum"],
                     qt = fields["q.start"],
                     c = fields["score"]))
-                
+
     if outfmt == "align":
         print("TODO: implement align output")
-        
+
+def reformat_parasail(path):
+    with open(floc + path, "r") as f:
+        data = f.readlines()#.replace('\n', '')
+
+    if outfmt == "seed":
+        with open(floc + path + "_formatted", "w") as w:
+            w.write("# Fields: s.len, s.seqnum, s.start, strand, "\
+                    "q.len, q.seqnum, q.start, score, identity\n")
+
+            for n, i in enumerate(data):
+                if i[0].isdigit():
+                    relevant = n
+                    break
+                if i.strip().startswith("file"):
+                    db = i.strip("\n").split(":")[1][1:]
+                if i.strip().startswith("query"):
+                    q = i.strip("\n").split(":")[1][1:]
+
+            db_ids = fasta_get_ids(db)
+            q_ids = fasta_get_ids(q)
+            data = data[relevant + 1:]
+
+            for i in data:
+                reset(fields)
+                if i[0].isdigit():
+                    i = i.strip("\n").split(",")
+
+                    fields["q.seqnum"] = q_ids[int(i[0])]
+                    fields["s.seqnum"] = db_ids[int(i[1])]
+                    fields["score"] = int(i[4])
+                    fields["strand"] = 'F'
+                    fields["q.start"] = int(i[5]) - int(i[9]) + 1
+                    fields["q.len"] = int(i[9])
+                    fields["s.start"] = int(i[6]) - int(i[9]) + 1
+                    fields["s.len"] = int(i[9])
+
+                    w.write("{sl}\t{ss}\t{st}\t{s}\t{ql}\t{qs}\t{qt}\t{c}\n".format(
+                            sl = fields["s.len"],
+                            ss = fields["s.seqnum"],
+                            st = fields["s.start"],
+                            s = fields["strand"],
+                            ql = fields["q.len"],
+                            qs = fields["q.seqnum"],
+                            qt = fields["q.start"],
+                            c = fields["score"]))
+                else:
+                    pass
+
+    if outfmt == "align":
+        print("TODO: implement align output")
+
 def reformat_ssearch(path):
     with open(floc + path, "r") as f:
         data = f.read()#.replace('\n', '')
-        
+
     data = data.split(">>")
     out = [0]
-    
+
     for n, i in enumerate(data):
         if i.startswith(">"):
             out.append(n)
     for i in out[::-1]:
         del data[i]
-    
+
     if outfmt == "seed":
         with open(floc + path + "_formatted", "w") as w:
             w.write("# Fields: s.len, s.seqnum, s.start, strand, "\
@@ -76,9 +135,9 @@ def reformat_ssearch(path):
             for i in data:
                 reset(fields)
                 i = i.split("\n")
-                
+
                 rest = i[2].split("overlap (")[1][:-1].split("-")
-                
+
                 fields["q.seqnum"] = int(i[5].split(" ")[0])
                 fields["s.seqnum"] = int(i[7].split(" ")[0])
                 fields["score"] = int(i[2].split(";")[0].split(":")[1])
@@ -88,7 +147,7 @@ def reformat_ssearch(path):
                 fields["s.start"] = int(rest[1].split(":")[1])
                 fields["s.len"] = int(rest[2]) - fields["s.start"] + 1
                 fields["identity"] = float(i[2].split(";")[1].split("%")[0])
-                
+
                 w.write("{sl}\t{ss}\t{st}\t{s}\t{ql}\t{qs}\t{qt}\t{c}\t{i}\n".format(
                         sl = fields["s.len"],
                         ss = fields["s.seqnum"],
@@ -102,14 +161,14 @@ def reformat_ssearch(path):
 
     if outfmt == "align":
         print("TODO: implement align output")
-        
+
 def reformat_seqan(path):
     with open(floc + path, "r") as f:
         data = f.read()
-        
+
     data = data.split("Score = ")
     del data[0]
-    
+
     if outfmt == "seed":
         with open(floc + path + "_formatted", "w") as w:
             w.write("# Fields: s.len, s.seqnum, s.start, strand, "\
@@ -118,7 +177,7 @@ def reformat_seqan(path):
                 reset(fields)
                 i = i.split("\n")
                 rest = i[-3].split("to")
-                
+
                 fields["s.seqnum"] = int(rest[0].split("[")[0])
                 fields["q.seqnum"] = int(rest[1].split("[")[0])
                 fields["score"] = int(i[0])
@@ -127,7 +186,7 @@ def reformat_seqan(path):
                 fields["s.len"] = int(rest[0].split("[")[1].split(":")[1][:-2]) - fields["s.start"] + 1
                 fields["q.start"] = int(rest[1].split("[")[1].split(":")[0])
                 fields["q.len"] = int(rest[1].split("[")[1].split(":")[1][:-1]) - fields["q.start"] + 1
-                
+
                 w.write("{sl}\t{ss}\t{st}\t{s}\t{ql}\t{qs}\t{qt}\t{c}\n".format(
                         sl = fields["s.len"],
                         ss = fields["s.seqnum"],
@@ -144,7 +203,7 @@ def reformat_seqan(path):
 def reformat_swipe(path):
     with open(floc + path, "r") as f:
         data = f.read()
-    
+
     if outfmt == "seed":
         with open(floc + path + "_formatted", "w") as w:
             w.write("# Fields: s.len, s.seqnum, s.start, strand, "\
@@ -159,7 +218,7 @@ def reformat_swipe(path):
                 for i in run:
                     reset(fields)
                     i = i.split("\n")
-                                    
+
                     fields["s.seqnum"] = int(i[0][i[0].index(" "):])
                     fields["q.seqnum"] = query
                     fields["score"] = int(i[3].split("=")[1])
@@ -173,7 +232,7 @@ def reformat_swipe(path):
                         fields["q.len"] = int(i[-5].split(" ")[-1]) - fields["q.start"] + 1
                         fields["s.len"] = int(i[-3].split(" ")[-1]) - fields["s.start"] + 1
                     fields["identity"] = int(i[4].split("%")[0].split("(")[1])
-                    
+
                     w.write("{sl}\t{ss}\t{st}\t{s}\t{ql}\t{qs}\t{qt}\t{c}\t{i}\n".format(
                             sl = fields["s.len"],
                             ss = fields["s.seqnum"],
@@ -184,16 +243,16 @@ def reformat_swipe(path):
                             qt = fields["q.start"],
                             c = fields["score"],
                             i = fields["identity"]))
-                
+
     if outfmt == "align":
         print("TODO: implement align output")
-        
+
 def reformat_swalign(path):
     with open(floc + path, "r") as f:
         data = f.read()
-    
+
     data = data.split("\n")
-    
+
     with open(floc + path + "_formatted", "w") as w:
         w.write("# Fields: s.len, s.seqnum, s.start, strand, "\
                 "q.len, q.seqnum, q.start, score\n")
@@ -202,7 +261,7 @@ def reformat_swalign(path):
             if i.startswith("#") or i == "":
                 continue
             i = i.split("\t")
-        
+
             fields["s.seqnum"] = int(i[0])
             fields["q.seqnum"] = int(i[1])
             fields["score"] = int(i[6].strip("\n"))
@@ -211,7 +270,7 @@ def reformat_swalign(path):
             fields["s.len"] = int(i[3])
             fields["q.start"] = int(i[4])
             fields["q.len"] = int(i[5])
-            
+
             w.write("{sl}\t{ss}\t{st}\t{s}\t{ql}\t{qs}\t{qt}\t{c}\n".format(
                     sl = fields["s.len"],
                     ss = fields["s.seqnum"],
@@ -221,17 +280,17 @@ def reformat_swalign(path):
                     qs = fields["q.seqnum"],
                     qt = fields["q.start"],
                     c = fields["score"]))
-            
+
     if outfmt == "align":
         pass
 
 def main():
     files = [ f for f in os.listdir(os.path.abspath(floc)) if f != "placeholder" and
-                                                            not f.startswith(".") and 
+                                                            not f.startswith(".") and
                                                             not f.endswith("_formatted")]
     print("attempting to reformat: ")
     print(files)
-    
+
     for i in files:
         try:
             if "ssw" in i:
@@ -249,11 +308,16 @@ def main():
             elif "swalign" in i:
                 reformat_swalign(i)
                 pass
+            elif "parasail" in i:
+                reformat_parasail(i)
+                pass
             else:
                 print("skipping", i)
-        except:
+        except Exception as e:
             print("error in ", i)
-        
+            print("error was:\n", e)
+            print()
+
 fields = {
     "s.len":None,
     "s.seqnum":None,
@@ -280,6 +344,6 @@ try:
 except:
     print("second argument is location of output files")
     sys.exit(1)
-        
+
 if __name__ == '__main__':
     main()
